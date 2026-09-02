@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "크리마 적립금 지급",
+  "version": "0.1.0",
+  "description": "기존 Chrome 로그인 세션으로 크리마 리뷰를 점검합니다.",
+  "permissions": ["storage", "tabs", "scripting", "downloads", "activeTab"],
+  "host_permissions": [
+    "<all_urls>",
+    "https://www.cre.ma/*",
+    "https://*.cre.ma/*"
+  ],
+  "background": {"service_worker": "background.js"},
+  "content_scripts": [
+    {
+      "matches": ["https://www.cre.ma/*", "https://*.cre.ma/*"],
+      "js": ["crema.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_title": "크리마 적립금 지급",
+    "default_popup": "popup.html"
+  }
+}
