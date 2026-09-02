@@ -1,6 +1,6 @@
 # Crema Review Automation
 
-Chrome 확장 프로그램과 로컬 저장 브리지를 이용해 크리마 관리자 리뷰 업무를 자동화하는 프로젝트입니다.
+Chrome 확장 프로그램 하나로 크리마 관리자 리뷰 업무를 자동화하는 프로젝트입니다.
 
 ## 주요 기능
 
@@ -8,8 +8,9 @@ Chrome 확장 프로그램과 로컬 저장 브리지를 이용해 크리마 관
 - 크리마 리뷰 관리자 페이지 직접 진입
 - `신규 리뷰 관리` 및 `적립금 지급 필요` 탭 자동 탐색
 - 상태가 `부정 리뷰`이고 별점이 2점이며 강한 불만 표현이 포함된 리뷰 탐지
-- 부정 리뷰 화면을 날짜 기반 PNG 파일로 저장
-- 탐지 결과를 JSON으로 로컬 저장
+- 부정 리뷰 화면을 Chrome 다운로드 폴더 아래 날짜 기반 PNG 파일로 저장
+- 탐지 결과를 같은 하위 폴더에 JSON으로 저장
+- 확장 프로그램 팝업에서 캡처 하위 폴더 설정
 - 확장 프로그램 팝업에서 수동 점검 실행
 - 오류나 로그인 만료 시 적립금 지급을 수행하지 않는 fail-closed 동작
 
@@ -28,24 +29,16 @@ Chrome 확장 프로그램과 로컬 저장 브리지를 이용해 크리마 관
 
 ```text
 extension/          Chrome Manifest V3 확장 프로그램
-local_bridge.py     캡처와 JSON을 지정 폴더에 저장하는 로컬 HTTP 브리지
 config.example.json 설정 예시
 ```
 
 ## 설치
 
-1. Python 3.10 이상을 설치합니다.
-2. 캡처 폴더를 환경 변수로 지정하고 브리지를 실행합니다.
-
-```powershell
-$env:CREMA_CAPTURE_DIR = "$HOME\Downloads\crema-negative-reviews"
-python .\local_bridge.py
-```
-
-3. Chrome에서 `chrome://extensions/`를 엽니다.
-4. 개발자 모드를 켭니다.
-5. `압축해제된 확장 프로그램을 로드합니다`를 눌러 `extension` 폴더를 선택합니다.
-6. 확장 프로그램 아이콘의 `지금 점검 실행` 버튼을 누릅니다.
+1. Chrome에서 `chrome://extensions/`를 엽니다.
+2. 개발자 모드를 켭니다.
+3. `압축해제된 확장 프로그램을 로드합니다`를 눌러 `extension` 폴더를 선택합니다.
+4. 확장 프로그램 팝업에서 다운로드 폴더 아래 사용할 하위 폴더를 지정합니다.
+5. `지금 점검 실행` 버튼을 누릅니다.
 
 ## 보안 및 운영 주의사항
 
@@ -58,7 +51,6 @@ python .\local_bridge.py
 
 - Chrome Extension Manifest V3
 - JavaScript
-- Python 표준 라이브러리 `http.server`
 - Windows Task Scheduler(운영 환경 선택 사항)
 
 ## License

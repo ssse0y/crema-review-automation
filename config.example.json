@@ -1,5 +1,5 @@
 {
-  "capture_directory": "C:/Users/your-name/Downloads/crema-negative-reviews",
+  "capture_subfolder": "crema-negative-reviews",
   "schedule": "weekdays 13:32 Asia/Seoul",
   "live_reward_enabled": false
 }

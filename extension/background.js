@@ -1,13 +1,19 @@
-const BRIDGE = "http://127.0.0.1:18765";
+function safeFolder(value) {
+  const cleaned = String(value || "부정리뷰")
+    .replace(/[\\:*?"<>|]/g, "_")
+    .replace(/^\/+|\/+$/g, "")
+    .trim();
+  return cleaned || "부정리뷰";
+}
 
-async function bridge(path, body) {
-  const response = await fetch(BRIDGE + path, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) throw new Error(`로컬 저장 실패: ${response.status}`);
-  return response.json();
+async function settings() {
+  const data = await chrome.storage.local.get({captureFolder: "부정리뷰"});
+  return {captureFolder: safeFolder(data.captureFolder)};
+}
+
+async function downloadText(filename, value) {
+  const url = `data:application/json;charset=utf-8,${encodeURIComponent(value)}`;
+  return chrome.downloads.download({url, filename, conflictAction: "overwrite", saveAs: false});
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -21,19 +27,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "capture") {
       const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, {format: "png"});
-      sendResponse(await bridge("/capture", {dataUrl, index: message.index, label: message.label || ""}));
+      const {captureFolder} = await settings();
+      const date = new Date().toLocaleDateString("sv-SE");
+      const suffix = message.index ? `_${String(message.index).padStart(2, "0")}` : `_${message.label || "진단"}`;
+      const filename = `${captureFolder}/${date}${suffix}.png`;
+      const downloadId = await chrome.downloads.download({url: dataUrl, filename, conflictAction: "uniquify", saveAs: false});
+      sendResponse({ok: true, downloadId, filename});
       return;
     }
     if (message.type === "log") {
-      sendResponse(await bridge("/log", {message: message.message}));
+      const prior = await chrome.storage.local.get({automationLog: []});
+      const entry = `[${new Date().toLocaleString("ko-KR")}] ${message.message}`;
+      await chrome.storage.local.set({automationLog: [...prior.automationLog.slice(-199), entry]});
+      sendResponse({ok: true});
       return;
     }
     if (message.type === "reviews") {
-      sendResponse(await bridge("/reviews", {rows: message.rows}));
+      const {captureFolder} = await settings();
+      const date = new Date().toLocaleDateString("sv-SE");
+      const filename = `${captureFolder}/${date}_부정리뷰.json`;
+      await downloadText(filename, JSON.stringify(message.rows || [], null, 2));
+      sendResponse({ok: true, filename});
       return;
     }
   })().catch(async error => {
-    try { await bridge("/log", {message: `확장 프로그램 백그라운드 오류: ${error}`}); } catch (_) {}
+    const prior = await chrome.storage.local.get({automationLog: []});
+    await chrome.storage.local.set({automationLog: [...prior.automationLog.slice(-199), `[${new Date().toLocaleString("ko-KR")}] 백그라운드 오류: ${error}`]});
     sendResponse({ok: false, error: String(error)});
   });
   return true;
