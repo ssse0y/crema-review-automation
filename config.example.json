@@ -1,5 +1,5 @@
 {
   "capture_subfolder": "crema-negative-reviews",
-  "schedule": "weekdays 13:32 Asia/Seoul",
+  "run_mode": "manual",
   "live_reward_enabled": false
 }

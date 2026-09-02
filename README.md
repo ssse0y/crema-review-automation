@@ -41,6 +41,8 @@ config.example.json 설정 예시
    저장 후에는 `Chrome 기본 다운로드 폴더\\부정리뷰` 형식으로 경로가 표시되며 `수정`으로 변경할 수 있습니다.
 5. `지금 점검 실행` 버튼을 누릅니다.
 
+이 확장 프로그램은 예약 실행을 등록하지 않습니다. 사용자가 팝업의 `지금 점검 실행`을 누른 경우에만 동작합니다.
+
 ## 보안 및 운영 주의사항
 
 - 비밀번호, 쿠키, Chrome 프로필, Google Sheet ID를 저장소에 포함하지 않습니다.
@@ -52,7 +54,6 @@ config.example.json 설정 예시
 
 - Chrome Extension Manifest V3
 - JavaScript
-- Windows Task Scheduler(운영 환경 선택 사항)
 
 ## License
 
