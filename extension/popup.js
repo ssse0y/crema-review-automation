@@ -9,18 +9,20 @@ const edit = document.getElementById("edit");
 
 function showSaved(value) {
   folder.value = value;
-  savedPath.textContent = `Chrome 기본 다운로드 폴더\\${value.replaceAll("/", "\\")}`;
+  savedPath.textContent = value
+    ? `Chrome 기본 다운로드 폴더\\${value.replaceAll("/", "\\")}`
+    : "Chrome 기본 다운로드 폴더";
   editArea.classList.add("hidden");
   savedArea.classList.remove("hidden");
 }
 
-chrome.storage.local.get({captureFolder: "부정리뷰", captureFolderSaved: false}).then(data => {
+chrome.storage.local.get({captureFolder: "", captureFolderSaved: true}).then(data => {
   folder.value = data.captureFolder;
   if (data.captureFolderSaved) showSaved(data.captureFolder);
 });
 
 save.addEventListener("click", async () => {
-  const value = folder.value.trim() || "부정리뷰";
+  const value = folder.value.trim();
   await chrome.storage.local.set({captureFolder: value, captureFolderSaved: true});
   showSaved(value);
   status.textContent = "저장 경로를 저장했습니다.";
@@ -33,7 +35,7 @@ edit.addEventListener("click", () => {
 });
 
 button.addEventListener("click", async () => {
-  await chrome.storage.local.set({captureFolder: folder.value.trim() || "부정리뷰"});
+  await chrome.storage.local.set({captureFolder: folder.value.trim()});
   button.disabled = true;
   status.textContent = "관리자 화면을 여는 중입니다…";
   const result = await chrome.runtime.sendMessage({type: "runNow"});

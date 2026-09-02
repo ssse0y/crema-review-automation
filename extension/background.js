@@ -1,13 +1,12 @@
 function safeFolder(value) {
-  const cleaned = String(value || "부정리뷰")
+  return String(value || "")
     .replace(/[\\:*?"<>|]/g, "_")
     .replace(/^\/+|\/+$/g, "")
     .trim();
-  return cleaned || "부정리뷰";
 }
 
 async function settings() {
-  const data = await chrome.storage.local.get({captureFolder: "부정리뷰"});
+  const data = await chrome.storage.local.get({captureFolder: ""});
   return {captureFolder: safeFolder(data.captureFolder)};
 }
 
@@ -30,7 +29,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const {captureFolder} = await settings();
       const date = new Date().toLocaleDateString("sv-SE");
       const suffix = message.index ? `_${String(message.index).padStart(2, "0")}` : `_${message.label || "진단"}`;
-      const filename = `${captureFolder}/${date}${suffix}.png`;
+      const filename = `${captureFolder ? captureFolder + "/" : ""}${date}${suffix}.png`;
       const downloadId = await chrome.downloads.download({url: dataUrl, filename, conflictAction: "uniquify", saveAs: false});
       sendResponse({ok: true, downloadId, filename});
       return;
@@ -45,7 +44,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "reviews") {
       const {captureFolder} = await settings();
       const date = new Date().toLocaleDateString("sv-SE");
-      const filename = `${captureFolder}/${date}_부정리뷰.json`;
+      const filename = `${captureFolder ? captureFolder + "/" : ""}${date}_부정리뷰.json`;
       await downloadText(filename, JSON.stringify(message.rows || [], null, 2));
       sendResponse({ok: true, filename});
       return;
