@@ -7,8 +7,11 @@
     h1 { margin: 0 0 8px; font-size: 16px; }
     p { margin: 0 0 14px; color: #5f6368; font-size: 12px; line-height: 1.5; }
     label { display: block; margin-bottom: 5px; font-size: 12px; font-weight: 700; }
-    input { box-sizing: border-box; width: 100%; margin-bottom: 12px; border: 1px solid #dadce0; border-radius: 6px; padding: 8px; }
-    button { width: 100%; border: 0; border-radius: 8px; padding: 11px; background: #1a73e8; color: white; font-weight: 700; cursor: pointer; }
+    input { box-sizing: border-box; width: 100%; margin-bottom: 10px; border: 1px solid #dadce0; border-radius: 6px; padding: 8px; }
+    button { width: 100%; border: 0; border-radius: 8px; padding: 10px; background: #1a73e8; color: white; font-weight: 700; cursor: pointer; }
+    .secondary { margin-bottom: 12px; background: #eef3fc; color: #174ea6; }
+    .path { margin-bottom: 8px; padding: 9px; border-radius: 6px; background: #f1f3f4; font-size: 12px; line-height: 1.45; word-break: break-all; }
+    .hidden { display: none; }
     button:disabled { background: #9aa0a6; cursor: default; }
     #status { margin-top: 10px; min-height: 18px; font-size: 12px; color: #137333; }
   </style>
@@ -16,8 +19,16 @@
 <body>
   <h1>크리마 리뷰 자동화</h1>
   <p>캡처는 Chrome 다운로드 폴더 아래 지정한 하위 폴더에 저장됩니다. 현재는 실제 지급이 잠겨 있습니다.</p>
-  <label for="folder">캡처 하위 폴더</label>
-  <input id="folder" value="부정리뷰" placeholder="예: 크리마/부정리뷰">
+  <div id="editArea">
+    <label for="folder">캡처 하위 폴더</label>
+    <input id="folder" value="부정리뷰" placeholder="예: 크리마/부정리뷰">
+    <button id="save" class="secondary">저장하기</button>
+  </div>
+  <div id="savedArea" class="hidden">
+    <label>캡처 저장 경로</label>
+    <div id="savedPath" class="path"></div>
+    <button id="edit" class="secondary">수정</button>
+  </div>
   <button id="run">지금 점검 실행</button>
   <div id="status"></div>
   <script src="popup.js"></script>

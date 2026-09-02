@@ -1,14 +1,35 @@
 const button = document.getElementById("run");
 const status = document.getElementById("status");
 const folder = document.getElementById("folder");
+const editArea = document.getElementById("editArea");
+const savedArea = document.getElementById("savedArea");
+const savedPath = document.getElementById("savedPath");
+const save = document.getElementById("save");
+const edit = document.getElementById("edit");
 
-chrome.storage.local.get({captureFolder: "부정리뷰"}).then(data => {
+function showSaved(value) {
+  folder.value = value;
+  savedPath.textContent = `Chrome 기본 다운로드 폴더\\${value.replaceAll("/", "\\")}`;
+  editArea.classList.add("hidden");
+  savedArea.classList.remove("hidden");
+}
+
+chrome.storage.local.get({captureFolder: "부정리뷰", captureFolderSaved: false}).then(data => {
   folder.value = data.captureFolder;
+  if (data.captureFolderSaved) showSaved(data.captureFolder);
 });
 
-folder.addEventListener("change", async () => {
-  await chrome.storage.local.set({captureFolder: folder.value.trim() || "부정리뷰"});
-  status.textContent = "저장 폴더 설정을 저장했습니다.";
+save.addEventListener("click", async () => {
+  const value = folder.value.trim() || "부정리뷰";
+  await chrome.storage.local.set({captureFolder: value, captureFolderSaved: true});
+  showSaved(value);
+  status.textContent = "저장 경로를 저장했습니다.";
+});
+
+edit.addEventListener("click", () => {
+  savedArea.classList.add("hidden");
+  editArea.classList.remove("hidden");
+  folder.focus();
 });
 
 button.addEventListener("click", async () => {
