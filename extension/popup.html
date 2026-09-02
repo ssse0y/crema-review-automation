@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { width: 260px; margin: 0; padding: 16px; font-family: system-ui, sans-serif; color: #202124; }
+    h1 { margin: 0 0 8px; font-size: 16px; }
+    p { margin: 0 0 14px; color: #5f6368; font-size: 12px; line-height: 1.5; }
+    button { width: 100%; border: 0; border-radius: 8px; padding: 11px; background: #1a73e8; color: white; font-weight: 700; cursor: pointer; }
+    button:disabled { background: #9aa0a6; cursor: default; }
+    #status { margin-top: 10px; min-height: 18px; font-size: 12px; color: #137333; }
+  </style>
+</head>
+<body>
+  <h1>크리마 리뷰 자동화</h1>
+  <p>관리자 화면을 열어 부정 리뷰와 적립금 지급 대상을 점검합니다. 현재는 실제 지급이 잠겨 있습니다.</p>
+  <button id="run">지금 점검 실행</button>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
