@@ -6,6 +6,7 @@ const savedArea = document.getElementById("savedArea");
 const savedPath = document.getElementById("savedPath");
 const save = document.getElementById("save");
 const edit = document.getElementById("edit");
+const openDownloads = document.getElementById("openDownloads");
 
 function showSaved(value) {
   folder.value = value;
@@ -32,6 +33,11 @@ edit.addEventListener("click", () => {
   savedArea.classList.add("hidden");
   editArea.classList.remove("hidden");
   folder.focus();
+});
+
+openDownloads.addEventListener("click", async () => {
+  await chrome.tabs.create({url: "chrome://settings/downloads"});
+  window.close();
 });
 
 button.addEventListener("click", async () => {
