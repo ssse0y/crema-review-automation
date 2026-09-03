@@ -356,7 +356,15 @@
     const reviewSave = await chrome.runtime.sendMessage({type: "reviews", rows});
     if (!reviewSave?.ok) throw new Error(`시트 기록 대기 데이터 저장 실패: ${reviewSave?.error || "알 수 없는 오류"}`);
     await log(`부정 리뷰 ${rows.length}건 캡처 및 시트 기록 대기 저장 완료`);
-    await setStatus("success", `적립금 지급과 부정 리뷰 ${rows.length}건의 캡처 저장이 완료되었습니다.`, "시트 직접 기록 기능은 아직 연결 전이며 추출 데이터는 기록 대기 상태로 보관됩니다.");
+    let sheetSummary = "기록할 부정 리뷰가 없습니다.";
+    if (rows.length) {
+      currentStage = "Google Sheets 기록";
+      const sheetWrite = await chrome.runtime.sendMessage({type: "writeSheet", rows});
+      if (!sheetWrite?.ok) throw new Error(sheetWrite?.error || "Google Sheets 기록 실패");
+      sheetSummary = `스프레드시트 ${sheetWrite.inserted || 0}건 기록, ${sheetWrite.skipped || 0}건 중복 제외`;
+      await log(sheetSummary);
+    }
+    await setStatus("success", `적립금 지급과 부정 리뷰 ${rows.length}건 처리가 완료되었습니다.`, sheetSummary);
     await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
   }
   run().catch(async error => {

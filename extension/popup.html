@@ -79,6 +79,17 @@
       <button id="editSheet" class="secondary compact">수정</button>
     </div>
   </div>
+  <details id="sheetAuth">
+    <summary>Google Sheets 권한 연결</summary>
+    <label for="webAppUrl">Apps Script 배포 URL</label>
+    <input id="webAppUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
+    <label for="sheetApiKey">연결 키</label>
+    <div class="inline-row">
+      <input id="sheetApiKey" type="password" placeholder="setupApiKey에서 발급한 키">
+      <button id="saveAuth" class="secondary compact">저장</button>
+    </div>
+    <div id="authState" class="hint"></div>
+  </details>
   <button id="run">적립금 지급</button>
   <div id="runResult"></div>
   <details id="errorDetails" class="hidden">

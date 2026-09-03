@@ -10,6 +10,12 @@ async function settings() {
   return {captureFolder: safeFolder(data.captureFolder)};
 }
 
+function parseSpreadsheet(url) {
+  const id = String(url || "").match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)?.[1] || "";
+  const gid = String(url || "").match(/(?:[#?&]gid=)(\d+)/)?.[1];
+  return {spreadsheetId: id, sheetId: gid === undefined ? null : Number(gid)};
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message.type === "runNow") {
@@ -73,6 +79,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         pendingReviewSavedAt: new Date().toISOString()
       });
       sendResponse({ok: true, stored: "pendingReviewRows"});
+      return;
+    }
+    if (message.type === "writeSheet") {
+      const config = await chrome.storage.local.get({
+        reviewSheetUrl: "",
+        targetSheetName: "",
+        sheetWebAppUrl: "",
+        sheetApiKey: "",
+        pendingReviewRows: []
+      });
+      const rows = message.rows || config.pendingReviewRows || [];
+      const target = parseSpreadsheet(config.reviewSheetUrl);
+      if (!target.spreadsheetId) throw new Error("부정리뷰 기록 링크가 올바르지 않습니다.");
+      if (!config.sheetWebAppUrl || !config.sheetApiKey) throw new Error("Google Sheets 권한 연결이 필요합니다.");
+      const response = await fetch(config.sheetWebAppUrl, {
+        method: "POST",
+        headers: {"Content-Type": "text/plain;charset=utf-8"},
+        body: JSON.stringify({
+          apiKey: config.sheetApiKey,
+          spreadsheetId: target.spreadsheetId,
+          sheetId: target.sheetId,
+          sheetName: config.targetSheetName || "",
+          rows
+        }),
+        redirect: "follow"
+      });
+      if (!response.ok) throw new Error(`Google Sheets 연결 오류 (${response.status})`);
+      const result = await response.json();
+      if (!result.ok) throw new Error(result.error || "Google Sheets 기록 실패");
+      await chrome.storage.local.set({pendingReviewRows: [], pendingReviewSavedAt: ""});
+      sendResponse({ok: true, ...result});
       return;
     }
   })().catch(async error => {
