@@ -14,7 +14,6 @@ const savedSheetUrl = document.getElementById("savedSheetUrl");
 const saveSheet = document.getElementById("saveSheet");
 const editSheet = document.getElementById("editSheet");
 const sheetTabName = document.getElementById("sheetTabName");
-const savedSheetTab = document.getElementById("savedSheetTab");
 
 function showSaved(value) {
   folder.value = value;
@@ -53,9 +52,6 @@ function showSavedSheet(value, tabName) {
   sheetTabName.value = tabName || "";
   savedSheetUrl.href = value;
   savedSheetUrl.title = value;
-  savedSheetTab.textContent = tabName
-    ? `기록 탭: ${tabName}`
-    : "기록 탭: 링크를 열었을 때 표시되는 탭";
   sheetEditArea.classList.add("hidden");
   sheetSavedArea.classList.remove("hidden");
 }

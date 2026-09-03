@@ -10,7 +10,7 @@
     input { box-sizing: border-box; width: 100%; margin-bottom: 10px; border: 1px solid #dadce0; border-radius: 6px; padding: 8px; }
     button { width: 100%; border: 0; border-radius: 8px; padding: 10px; background: #1a73e8; color: white; font-weight: 700; cursor: pointer; }
     .secondary { margin-bottom: 12px; background: #eef3fc; color: #174ea6; }
-    .path { margin-bottom: 8px; padding: 9px; border-radius: 6px; background: #f1f3f4; font-size: 12px; line-height: 1.45; word-break: break-all; }
+    .path { margin-bottom: 8px; padding: 9px; border-radius: 6px; background: #f1f3f4; font-size: 12px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     details { margin: 0 0 14px; font-size: 12px; }
     summary { cursor: pointer; color: #1a73e8; font-weight: 700; list-style: none; }
     summary::-webkit-details-marker { display: none; }
@@ -63,7 +63,6 @@
       <button id="saveSheet" class="secondary compact">저장</button>
     </div>
     <label for="sheetTabName">시트 탭 이름 (선택)</label>
-    <div class="hint">비워두면 링크를 열었을 때 표시되는 탭에 기록합니다.</div>
     <input id="sheetTabName" placeholder="예: 크리마 부정리뷰 모음">
   </div>
   <div id="sheetSavedArea" class="hidden">
@@ -72,7 +71,6 @@
       <div class="path"><a id="savedSheetUrl" class="link" href="#">저장된 링크 열기</a></div>
       <button id="editSheet" class="secondary compact">수정</button>
     </div>
-    <div id="savedSheetTab" class="hint"></div>
   </div>
   <button id="run">적립금 지급</button>
   <div id="status"></div>
