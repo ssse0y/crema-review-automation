@@ -15,6 +15,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "runNow") {
       await chrome.storage.local.set({
         cremaAutomationRunning: true,
+        cremaAutomationPhase: "payment",
         liveEnabled: false,
         lastRunStatus: "running",
         lastRunMessage: "적립금 지급 작업을 실행하고 있습니다.",

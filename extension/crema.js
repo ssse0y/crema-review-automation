@@ -11,6 +11,7 @@
   const log = message => chrome.runtime.sendMessage({type: "log", message}).catch(() => {});
   const setStatus = (status, message, detail = "") => chrome.runtime.sendMessage({type: "runStatus", status, message, detail}).catch(() => {});
   const compact = text => (text || "").replace(/\s+/g, "").trim();
+  let currentStage = "작업 시작";
 
   function findClickable(text) {
     const wanted = compact(text);
@@ -35,6 +36,63 @@
       await wait(500);
     }
     return false;
+  }
+
+  function findExactClickable(text, root = document) {
+    const wanted = compact(text);
+    return [...root.querySelectorAll("button,a,[role=button],[onclick]")]
+      .find(el => visible(el) && compact(el.innerText) === wanted);
+  }
+
+  async function clickExact(text, root = document, timeout = 5000) {
+    const until = Date.now() + timeout;
+    while (Date.now() < until) {
+      const el = findExactClickable(text, root);
+      if (el) {
+        el.scrollIntoView({block: "center"});
+        el.click();
+        await wait(700);
+        return true;
+      }
+      await wait(200);
+    }
+    return false;
+  }
+
+  function masterCheckbox() {
+    const tables = [...document.querySelectorAll("table")].filter(visible);
+    for (const table of tables) {
+      const checkbox = table.querySelector("thead input[type='checkbox'],thead [role='checkbox']");
+      if (checkbox && visible(checkbox)) return checkbox;
+    }
+    const header = [...document.querySelectorAll("thead")].find(visible);
+    return header?.querySelector("input[type='checkbox'],[role='checkbox']") || null;
+  }
+
+  async function payAllRewards() {
+    const checkbox = masterCheckbox();
+    if (!checkbox) throw new Error("적립금 지급 목록의 전체 선택 체크박스를 찾지 못했습니다.");
+    const checked = checkbox.matches("input") ? checkbox.checked : checkbox.getAttribute("aria-checked") === "true";
+    if (!checked) checkbox.click();
+    await wait(700);
+
+    const payButton = findExactClickable("적립금 지급");
+    if (!payButton) throw new Error("전체 선택 후 나타나는 ‘적립금 지급’ 버튼을 찾지 못했습니다.");
+    payButton.scrollIntoView({block: "center"});
+    // 지급 버튼 클릭으로 페이지가 새로고침되더라도 중복 지급하지 않도록 다음 단계를 먼저 기록한다.
+    await chrome.storage.local.set({cremaAutomationPhase: "capture"});
+    payButton.click();
+    await wait(800);
+
+    const dialog = [...document.querySelectorAll("[role='dialog'],.modal,.ant-modal,.MuiDialog-root")].find(visible);
+    if (dialog) {
+      const confirm = findExactClickable("확인", dialog) || findExactClickable("적립금 지급", dialog);
+      if (confirm) {
+        confirm.click();
+        await wait(1200);
+      }
+    }
+    await log("전체 적립금 지급 버튼 클릭 완료");
   }
 
   function containerFor(status) {
@@ -195,7 +253,7 @@
 
   async function run() {
     const marker = new URL(location.href).searchParams.get("crema_auto");
-    const state = await chrome.storage.local.get([RUN_KEY, "liveEnabled"]);
+    const state = await chrome.storage.local.get([RUN_KEY, "liveEnabled", "cremaAutomationPhase"]);
     if (marker === "1") await chrome.storage.local.set({[RUN_KEY]: true});
     if (marker !== "1" && !state[RUN_KEY]) return;
     if (findClickable("가입/로그인")) {
@@ -214,7 +272,11 @@
     await log("확장 프로그램 실행 시작");
     const onReviewAdmin = location.hostname === "admin.cre.ma" && location.pathname.startsWith("/v2/review/");
     const reachedNewReviews = onReviewAdmin ? await click("신규 리뷰 관리") : false;
-    if (!reachedNewReviews || !await click("적립금 지급 필요")) {
+    const phase = state.cremaAutomationPhase || "payment";
+    const reachedTargetTab = reachedNewReviews && (phase === "payment"
+      ? await click("적립금 지급 필요")
+      : await clickExact("전체"));
+    if (!reachedTargetTab) {
       const labels = [...document.querySelectorAll("button,a,[role=button]")]
         .filter(visible).map(el => (el.innerText || el.getAttribute("aria-label") || "").trim())
         .filter(Boolean).slice(0, 80);
@@ -225,6 +287,20 @@
       await chrome.storage.local.set({[RUN_KEY]: false});
       return;
     }
+    if (phase === "payment") {
+      const listRows = [...document.querySelectorAll("table tbody tr")].filter(row => visible(row) && (row.innerText || "").trim());
+      if (!listRows.length) {
+        await setStatus("success", "지급이 필요한 리뷰가 없습니다.", "");
+        await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
+        return;
+      }
+      currentStage = "적립금 지급";
+      await setStatus("running", `리뷰 ${listRows.length}건의 적립금을 지급하고 있습니다.`, "");
+      await payAllRewards();
+      await wait(1200);
+      if (!await clickExact("전체")) throw new Error("적립금 지급 후 ‘전체’ 탭으로 이동하지 못했습니다.");
+    }
+    currentStage = "부정 리뷰 캡처 및 저장";
     const statuses = [...document.querySelectorAll("body *")].filter(el => visible(el) && (el.innerText || "").trim() === "부정 리뷰");
     const rows = [];
     for (const status of statuses) {
@@ -280,18 +356,12 @@
     const reviewSave = await chrome.runtime.sendMessage({type: "reviews", rows});
     if (!reviewSave?.ok) throw new Error(`시트 기록 대기 데이터 저장 실패: ${reviewSave?.error || "알 수 없는 오류"}`);
     await log(`부정 리뷰 ${rows.length}건 캡처 및 시트 기록 대기 저장 완료`);
-    if (!state.liveEnabled) {
-      await log("최초 검증 전이므로 실제 지급 중단");
-      await setStatus("success", "캡처 및 저장 점검이 완료되었습니다.", "");
-      await chrome.storage.local.set({[RUN_KEY]: false});
-      return;
-    }
-    await log("지급 활성화는 화면 검증 후 별도 버전에서 수행됩니다");
-    await chrome.storage.local.set({[RUN_KEY]: false});
+    await setStatus("success", `적립금 지급과 부정 리뷰 ${rows.length}건의 캡처 저장이 완료되었습니다.`, "시트 직접 기록 기능은 아직 연결 전이며 추출 데이터는 기록 대기 상태로 보관됩니다.");
+    await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
   }
   run().catch(async error => {
     await log(`오류로 지급 중단: ${error}`);
-    await setStatus("error", "캡처본 저장 또는 리뷰 처리 중 오류가 발생했습니다.", String(error?.stack || error));
-    await chrome.storage.local.set({[RUN_KEY]: false});
+    await setStatus("error", `${currentStage} 중 오류가 발생했습니다.`, String(error?.stack || error));
+    await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "error"});
   });
 })();
