@@ -4,7 +4,9 @@
     "구매하지 마", "사지 마", "사지마", "비추천", "절대 사지", "진짜 구매하지",
     "화딱지", "화가", "화남", "짜증", "열받", "스트레스", "최악", "실망", "답답", "황당",
     "다시는", "환불", "교환", "돈 아깝", "돈아깝", "구림", "심하다", "말도 안",
-    "안됩니다", "안 됩니다", "못 쓰", "못쓰", "쓰지 못", "불량", "충격", "후회"
+    "안됩니다", "안 됩니다", "못 쓰", "못쓰", "쓰지 못", "불량", "충격", "후회",
+    "추천하지", "별로예요", "별로에요", "아쉬워", "불편", "작동하지", "작동 안",
+    "고장", "파손", "누락", "효과 없", "냄새가", "배송이 느", "품질이"
   ];
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const visible = el => !!(el && el.getClientRects().length);
@@ -127,8 +129,6 @@
     finalPayButton.click();
     for (let i = 0; i < 150 && visible(dialog); i++) await wait(200);
     if (visible(dialog)) throw new Error("최종 적립금 지급 후에도 지급 팝업이 닫히지 않았습니다. 입력값 또는 오류 메시지를 확인해주세요.");
-    // 팝업이 닫혀 실제 지급 요청이 접수된 것이 확인된 뒤에만 캡처 단계로 전환한다.
-    await chrome.storage.local.set({cremaAutomationPhase: "capture"});
     await log("최종 적립금 지급 버튼 1회 클릭 완료");
   }
 
@@ -288,6 +288,20 @@
     await wait(500);
   }
 
+  async function payoutCurrentTab() {
+    const pageText = document.body.innerText || "";
+    const resultMatch = pageText.match(/([\d,]+)\s*개의\s*결과/);
+    const resultCount = resultMatch ? Number(resultMatch[1].replaceAll(",", "")) : null;
+    const explicitlyEmpty = resultCount === 0 || /지급할 리뷰가 없습니다|검색 결과가 없습니다/.test(pageText);
+    if (explicitlyEmpty) return {paid: false, count: 0};
+    currentStage = "적립금 지급";
+    await setStatus("running", resultCount === null
+      ? "지급 대상 리뷰를 전체 선택하고 있습니다."
+      : `리뷰 ${resultCount}건의 적립금을 지급하고 있습니다.`, "");
+    await payAllRewards();
+    return {paid: true, count: resultCount};
+  }
+
   async function run() {
     const marker = new URL(location.href).searchParams.get("crema_auto");
     const state = await chrome.storage.local.get([RUN_KEY, "liveEnabled", "cremaAutomationPhase"]);
@@ -309,7 +323,7 @@
     await log("확장 프로그램 실행 시작");
     const onReviewAdmin = location.hostname === "admin.cre.ma" && location.pathname.startsWith("/v2/review/");
     const reachedNewReviews = onReviewAdmin ? await click("신규 리뷰 관리") : false;
-    const phase = state.cremaAutomationPhase || "payment";
+    const phase = state.cremaAutomationPhase || "review";
     const reachedTargetTab = reachedNewReviews && (phase === "payment"
       ? await click("적립금 지급 필요")
       : await clickExact("전체"));
@@ -325,28 +339,19 @@
       return;
     }
     if (phase === "payment") {
-      const pageText = document.body.innerText || "";
-      const resultMatch = pageText.match(/([\d,]+)\s*개의\s*결과/);
-      const resultCount = resultMatch ? Number(resultMatch[1].replaceAll(",", "")) : null;
-      const explicitlyEmpty = resultCount === 0 || /지급할 리뷰가 없습니다|검색 결과가 없습니다/.test(pageText);
-      if (explicitlyEmpty) {
-        await setStatus("success", "지급이 필요한 리뷰가 없습니다.", "");
-        await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
-        return;
-      }
-      currentStage = "적립금 지급";
-      await setStatus("running", resultCount === null
-        ? "지급 대상 리뷰를 전체 선택하고 있습니다."
-        : `리뷰 ${resultCount}건의 적립금을 지급하고 있습니다.`, "");
-      await payAllRewards();
-      await wait(1200);
-      if (!await clickExact("전체")) throw new Error("적립금 지급 후 ‘전체’ 탭으로 이동하지 못했습니다.");
+      const payment = await payoutCurrentTab();
+      await setStatus("success", payment.paid ? "적립금 지급이 완료되었습니다." : "지급이 필요한 리뷰가 없습니다.", "");
+      await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
+      return;
     }
     currentStage = "부정 리뷰 캡처 및 저장";
+    const reviewTable = [...document.querySelectorAll("table")]
+      .find(table => visible(table) && compact(table.querySelector("thead")?.innerText).includes("리뷰상세내용"));
+    const tableRows = reviewTable ? [...reviewTable.querySelectorAll("tbody tr")].filter(visible) : [];
     const statuses = [...document.querySelectorAll("body *")].filter(el => visible(el) && (el.innerText || "").trim() === "부정 리뷰");
+    const listRows = tableRows.length ? tableRows : [...new Set(statuses.map(status => status.closest("tr") || containerFor(status)))];
     const rows = [];
-    for (const status of statuses) {
-      const listRow = status.closest("tr") || containerFor(status);
+    for (const listRow of listRows) {
       const detailCell = reviewDetailCell(listRow);
       detailCell.scrollIntoView({block: "center"});
       await wait(250);
@@ -370,7 +375,7 @@
       };
       const ratingMatch = modalText.match(/(?:별점\s*)?([1-5])\s*\/\s*5|(?:별점|평점)\s*[:：]?\s*([1-5])(?:\.0)?\s*점?/);
       const rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[2]) : 0;
-      const qualifies = rating >= 1 && rating <= 3 &&
+      const qualifies = (rating >= 1 && rating <= 3) ||
         ANGER.some(word => bodyText.includes(word));
       if (qualifies) {
         const index = rows.length + 1;
@@ -398,15 +403,20 @@
     const reviewSave = await chrome.runtime.sendMessage({type: "reviews", rows});
     if (!reviewSave?.ok) throw new Error(`시트 기록 대기 데이터 저장 실패: ${reviewSave?.error || "알 수 없는 오류"}`);
     await log(`부정 리뷰 ${rows.length}건 캡처 및 시트 기록 대기 저장 완료`);
+    let sheetWrite = null;
     if (rows.length) {
       currentStage = "부정 리뷰 시트 기록";
-      const sheetWrite = await chrome.runtime.sendMessage({type: "writeSheet", rows});
+      sheetWrite = await chrome.runtime.sendMessage({type: "writeSheet", rows});
       if (!sheetWrite?.ok) throw new Error(`Google Sheets 기록 실패: ${sheetWrite?.error || "알 수 없는 오류"}`);
       await log(`Google Sheets에 ${sheetWrite.inserted || 0}건 기록 완료 (${sheetWrite.skipped || 0}건 중복 제외)`);
-      await setStatus("success", `적립금 지급, 부정 리뷰 ${rows.length}건 캡처 및 시트 기록이 완료되었습니다.`, sheetWrite.skipped ? `기존 기록과 중복된 ${sheetWrite.skipped}건은 제외했습니다.` : "");
-    } else {
-      await setStatus("success", "적립금 지급이 완료되었습니다.", "캡처 조건을 만족하는 부정 리뷰가 없습니다.");
     }
+    await chrome.storage.local.set({cremaAutomationPhase: "payment"});
+    if (!await click("적립금 지급 필요")) throw new Error("부정 리뷰 기록 후 ‘적립금 지급 필요’ 탭으로 이동하지 못했습니다.");
+    const payment = await payoutCurrentTab();
+    const detail = rows.length
+      ? `${rows.length}건을 캡처·기록했습니다.${sheetWrite?.skipped ? ` 중복 ${sheetWrite.skipped}건은 제외했습니다.` : ""}`
+      : "캡처 조건을 만족하는 부정 리뷰가 없습니다.";
+    await setStatus("success", payment.paid ? "부정 리뷰 처리와 적립금 지급이 완료되었습니다." : "부정 리뷰 처리가 완료되었으며 지급 대상은 없습니다.", detail);
     await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
   }
   run().catch(async error => {
