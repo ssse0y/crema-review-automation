@@ -299,14 +299,19 @@
       return;
     }
     if (phase === "payment") {
-      const listRows = [...document.querySelectorAll("table tbody tr")].filter(row => visible(row) && (row.innerText || "").trim());
-      if (!listRows.length) {
+      const pageText = document.body.innerText || "";
+      const resultMatch = pageText.match(/([\d,]+)\s*개의\s*결과/);
+      const resultCount = resultMatch ? Number(resultMatch[1].replaceAll(",", "")) : null;
+      const explicitlyEmpty = resultCount === 0 || /지급할 리뷰가 없습니다|검색 결과가 없습니다/.test(pageText);
+      if (explicitlyEmpty) {
         await setStatus("success", "지급이 필요한 리뷰가 없습니다.", "");
         await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
         return;
       }
       currentStage = "적립금 지급";
-      await setStatus("running", `리뷰 ${listRows.length}건의 적립금을 지급하고 있습니다.`, "");
+      await setStatus("running", resultCount === null
+        ? "지급 대상 리뷰를 전체 선택하고 있습니다."
+        : `리뷰 ${resultCount}건의 적립금을 지급하고 있습니다.`, "");
       await payAllRewards();
       await wait(1200);
       if (!await clickExact("전체")) throw new Error("적립금 지급 후 ‘전체’ 탭으로 이동하지 못했습니다.");
