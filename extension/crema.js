@@ -90,20 +90,42 @@
     const payButton = findExactClickable("적립금 지급");
     if (!payButton) throw new Error("전체 선택 후 나타나는 ‘적립금 지급’ 버튼을 찾지 못했습니다.");
     payButton.scrollIntoView({block: "center"});
-    // 지급 버튼 클릭으로 페이지가 새로고침되더라도 중복 지급하지 않도록 다음 단계를 먼저 기록한다.
-    await chrome.storage.local.set({cremaAutomationPhase: "capture"});
     payButton.click();
-    await wait(800);
+    await wait(500);
 
-    const dialog = [...document.querySelectorAll("[role='dialog'],.modal,.ant-modal,.MuiDialog-root")].find(visible);
-    if (dialog) {
-      const confirm = findExactClickable("확인", dialog) || findExactClickable("적립금 지급", dialog);
-      if (confirm) {
-        confirm.click();
-        await wait(1200);
+    let dialog = null;
+    for (let i = 0; i < 25; i++) {
+      const title = [...document.querySelectorAll("body *")].find(el => {
+        const text = compact(el.innerText);
+        return visible(el) && el.children.length <= 3 && text.startsWith("적립금지급") && text.includes("선택리뷰");
+      });
+      if (title) {
+        dialog = title.closest("[role='dialog'],.modal,.ant-modal,.MuiDialog-root");
+        if (!dialog) {
+          let candidate = title;
+          for (let depth = 0; depth < 8 && candidate.parentElement; depth++) {
+            candidate = candidate.parentElement;
+            const rect = candidate.getBoundingClientRect();
+            if (rect.width >= 450 && rect.height >= 280 && findExactClickable("적립금 지급", candidate)) {
+              dialog = candidate;
+              break;
+            }
+          }
+        }
+        if (dialog && visible(dialog)) break;
       }
+      await wait(200);
     }
-    await log("전체 적립금 지급 버튼 클릭 완료");
+    if (!dialog) throw new Error("목록의 적립금 지급 버튼을 눌렀지만 최종 지급 팝업이 열리지 않았습니다.");
+
+    const finalPayButton = findExactClickable("적립금 지급", dialog);
+    if (!finalPayButton) throw new Error("최종 지급 팝업의 파란 ‘적립금 지급’ 버튼을 찾지 못했습니다.");
+    // 최종 버튼을 누르기 직전에 다음 단계를 저장해 새로고침 후 중복 지급을 막는다.
+    await chrome.storage.local.set({cremaAutomationPhase: "capture"});
+    finalPayButton.click();
+    for (let i = 0; i < 30 && visible(dialog); i++) await wait(200);
+    if (visible(dialog)) throw new Error("최종 적립금 지급 후에도 지급 팝업이 닫히지 않았습니다. 입력값 또는 오류 메시지를 확인해주세요.");
+    await log("최종 적립금 지급 버튼 1회 클릭 완료");
   }
 
   function containerFor(status) {
