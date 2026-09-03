@@ -404,19 +404,28 @@
     if (!reviewSave?.ok) throw new Error(`시트 기록 대기 데이터 저장 실패: ${reviewSave?.error || "알 수 없는 오류"}`);
     await log(`부정 리뷰 ${rows.length}건 캡처 및 시트 기록 대기 저장 완료`);
     let sheetWrite = null;
+    let sheetError = "";
     if (rows.length) {
       currentStage = "부정 리뷰 시트 기록";
       sheetWrite = await chrome.runtime.sendMessage({type: "writeSheet", rows});
-      if (!sheetWrite?.ok) throw new Error(`Google Sheets 기록 실패: ${sheetWrite?.error || "알 수 없는 오류"}`);
-      await log(`Google Sheets에 ${sheetWrite.inserted || 0}건 기록 완료 (${sheetWrite.skipped || 0}건 중복 제외)`);
+      if (!sheetWrite?.ok) {
+        sheetError = sheetWrite?.error || "알 수 없는 오류";
+        await log(`Google Sheets 기록 실패, 적립금 지급은 계속 진행: ${sheetError}`);
+      } else {
+        await log(`Google Sheets에 ${sheetWrite.inserted || 0}건 기록 완료 (${sheetWrite.skipped || 0}건 중복 제외)`);
+      }
     }
     await chrome.storage.local.set({cremaAutomationPhase: "payment"});
     if (!await click("적립금 지급 필요")) throw new Error("부정 리뷰 기록 후 ‘적립금 지급 필요’ 탭으로 이동하지 못했습니다.");
     const payment = await payoutCurrentTab();
-    const detail = rows.length
+    const detail = sheetError
+      ? `${rows.length}건의 캡처는 저장했지만 시트 기록에 실패했습니다. 대기 데이터는 보관했습니다. 원인: ${sheetError}`
+      : rows.length
       ? `${rows.length}건을 캡처·기록했습니다.${sheetWrite?.skipped ? ` 중복 ${sheetWrite.skipped}건은 제외했습니다.` : ""}`
       : "캡처 조건을 만족하는 부정 리뷰가 없습니다.";
-    await setStatus("success", payment.paid ? "부정 리뷰 처리와 적립금 지급이 완료되었습니다." : "부정 리뷰 처리가 완료되었으며 지급 대상은 없습니다.", detail);
+    await setStatus(sheetError ? "error" : "success", payment.paid
+      ? (sheetError ? "적립금은 지급했지만 시트 기록에 실패했습니다." : "부정 리뷰 처리와 적립금 지급이 완료되었습니다.")
+      : (sheetError ? "시트 기록에 실패했으며 지급 대상은 없습니다." : "부정 리뷰 처리가 완료되었으며 지급 대상은 없습니다."), detail);
     await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
   }
   run().catch(async error => {
