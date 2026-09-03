@@ -65,7 +65,11 @@ saveSheet.addEventListener("click", async () => {
     status.textContent = "Google 스프레드시트 주소를 확인해주세요.";
     return;
   }
-  await chrome.storage.local.set({reviewSheetUrl: value, reviewSheetUrlSaved: true});
+  await chrome.storage.local.set({
+    reviewSheetUrl: value,
+    reviewSheetUrlSaved: true,
+    targetSheetName: "크리마 부정리뷰 모음"
+  });
   showSavedSheet(value);
   status.textContent = "부정리뷰 기록 링크를 저장했습니다.";
 });

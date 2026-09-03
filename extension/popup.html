@@ -19,6 +19,7 @@
     details ol { margin: 9px 0; padding-left: 22px; color: #5f6368; line-height: 1.55; }
     .settings { padding: 8px; background: #f1f3f4; color: #3c4043; }
     .link { color: #1967d2; text-decoration: none; }
+    .hint { margin: -5px 0 9px; color: #5f6368; font-size: 11px; line-height: 1.4; }
     .hidden { display: none; }
     button:disabled { background: #9aa0a6; cursor: default; }
     #run { padding: 13px; background: #16a34a; font-size: 14px; box-shadow: 0 2px 5px rgba(22, 163, 74, .28); }
@@ -50,11 +51,13 @@
   </details>
   <div id="sheetEditArea">
     <label for="sheetUrl">부정리뷰 기록 링크</label>
+    <div class="hint">링크 안의 ‘크리마 부정리뷰 모음’ 탭에 기록합니다.</div>
     <input id="sheetUrl" type="url" placeholder="Google 스프레드시트 주소를 입력하세요">
     <button id="saveSheet" class="secondary">저장하기</button>
   </div>
   <div id="sheetSavedArea" class="hidden">
     <label>부정리뷰 기록 링크</label>
+    <div class="hint">기록 탭: 크리마 부정리뷰 모음</div>
     <div class="path"><a id="savedSheetUrl" class="link" href="#">저장된 링크 열기</a></div>
     <button id="editSheet" class="secondary">수정</button>
   </div>
