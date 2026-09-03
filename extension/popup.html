@@ -21,6 +21,8 @@
     .link { color: #1967d2; text-decoration: none; }
     .hidden { display: none; }
     button:disabled { background: #9aa0a6; cursor: default; }
+    #run { padding: 13px; background: #16a34a; font-size: 14px; box-shadow: 0 2px 5px rgba(22, 163, 74, .28); }
+    #run:hover { background: #15803d; }
     #status { margin-top: 10px; min-height: 18px; font-size: 12px; color: #137333; }
   </style>
 </head>
@@ -28,12 +30,12 @@
   <h1>크리마 적립금 지급</h1>
   <p>처음에는 Chrome 기본 다운로드 폴더에 저장됩니다. 다른 폴더에 모아두려면 아래의 수정 버튼을 눌러 폴더 이름을 입력하세요.</p>
   <div id="editArea">
-    <label for="folder">캡처 하위 폴더</label>
+    <label for="folder">부정리뷰 캡처 저장 경로</label>
     <input id="folder" value="" placeholder="예: 부정리뷰 또는 크리마/부정리뷰">
     <button id="save" class="secondary">저장하기</button>
   </div>
   <div id="savedArea" class="hidden">
-    <label>캡처 저장 경로</label>
+    <label>부정리뷰 캡처 저장 경로</label>
     <div id="savedPath" class="path"></div>
     <button id="edit" class="secondary">수정</button>
   </div>
