@@ -59,22 +59,6 @@
     return false;
   }
 
-  function realClick(el) {
-    if (!el || !visible(el)) return false;
-    el.scrollIntoView({block: "center", inline: "center"});
-    const rect = el.getBoundingClientRect();
-    const x = rect.left + rect.width / 2;
-    const y = rect.top + rect.height / 2;
-    const target = document.elementFromPoint(x, y) || el;
-    const options = {bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, button: 0};
-    target.dispatchEvent(new PointerEvent("pointerdown", {...options, pointerId: 1, pointerType: "mouse", isPrimary: true}));
-    target.dispatchEvent(new MouseEvent("mousedown", options));
-    target.dispatchEvent(new PointerEvent("pointerup", {...options, pointerId: 1, pointerType: "mouse", isPrimary: true}));
-    target.dispatchEvent(new MouseEvent("mouseup", options));
-    target.dispatchEvent(new MouseEvent("click", options));
-    return true;
-  }
-
   function masterCheckbox() {
     const tables = [...document.querySelectorAll("table")].filter(visible);
     for (const table of tables) {
@@ -138,10 +122,10 @@
       .filter(el => visible(el) && compact(el.innerText) === "적립금지급" && !el.disabled && el.getAttribute("aria-disabled") !== "true")
       .sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
     if (!finalPayButton) throw new Error("최종 지급 팝업의 파란 ‘적립금 지급’ 버튼을 찾지 못했습니다.");
-    // 크리마 버튼은 프레임워크의 실제 포인터 이벤트를 요구할 수 있어
-    // 버튼 중앙에 일반 마우스 조작과 같은 이벤트 순서를 한 번만 보낸다.
-    realClick(finalPayButton);
-    for (let i = 0; i < 30 && visible(dialog); i++) await wait(200);
+    // 팝업 내부에서 찾은 실제 파란 버튼 자체를 한 번만 누른다.
+    // 자식 span에 합성 마우스 이벤트를 보내면 크리마가 무시하는 경우가 있다.
+    finalPayButton.click();
+    for (let i = 0; i < 150 && visible(dialog); i++) await wait(200);
     if (visible(dialog)) throw new Error("최종 적립금 지급 후에도 지급 팝업이 닫히지 않았습니다. 입력값 또는 오류 메시지를 확인해주세요.");
     // 팝업이 닫혀 실제 지급 요청이 접수된 것이 확인된 뒤에만 캡처 단계로 전환한다.
     await chrome.storage.local.set({cremaAutomationPhase: "capture"});
