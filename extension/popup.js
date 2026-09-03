@@ -13,6 +13,8 @@ const sheetUrl = document.getElementById("sheetUrl");
 const savedSheetUrl = document.getElementById("savedSheetUrl");
 const saveSheet = document.getElementById("saveSheet");
 const editSheet = document.getElementById("editSheet");
+const sheetTabName = document.getElementById("sheetTabName");
+const savedSheetTab = document.getElementById("savedSheetTab");
 
 function showSaved(value) {
   folder.value = value;
@@ -46,17 +48,22 @@ openDownloads.addEventListener("click", async () => {
   window.close();
 });
 
-function showSavedSheet(value) {
+function showSavedSheet(value, tabName) {
   sheetUrl.value = value;
+  sheetTabName.value = tabName || "";
   savedSheetUrl.href = value;
   savedSheetUrl.title = value;
+  savedSheetTab.textContent = tabName
+    ? `기록 탭: ${tabName}`
+    : "기록 탭: 링크를 열었을 때 표시되는 탭";
   sheetEditArea.classList.add("hidden");
   sheetSavedArea.classList.remove("hidden");
 }
 
-chrome.storage.local.get({reviewSheetUrl: "", reviewSheetUrlSaved: false}).then(data => {
+chrome.storage.local.get({reviewSheetUrl: "", reviewSheetUrlSaved: false, targetSheetName: ""}).then(data => {
   sheetUrl.value = data.reviewSheetUrl;
-  if (data.reviewSheetUrlSaved && data.reviewSheetUrl) showSavedSheet(data.reviewSheetUrl);
+  sheetTabName.value = data.targetSheetName;
+  if (data.reviewSheetUrlSaved && data.reviewSheetUrl) showSavedSheet(data.reviewSheetUrl, data.targetSheetName);
 });
 
 saveSheet.addEventListener("click", async () => {
@@ -68,9 +75,9 @@ saveSheet.addEventListener("click", async () => {
   await chrome.storage.local.set({
     reviewSheetUrl: value,
     reviewSheetUrlSaved: true,
-    targetSheetName: "크리마 부정리뷰 모음"
+    targetSheetName: sheetTabName.value.trim()
   });
-  showSavedSheet(value);
+  showSavedSheet(value, sheetTabName.value.trim());
   status.textContent = "부정리뷰 기록 링크를 저장했습니다.";
 });
 

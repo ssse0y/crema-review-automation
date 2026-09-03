@@ -51,14 +51,16 @@
   </details>
   <div id="sheetEditArea">
     <label for="sheetUrl">부정리뷰 기록 링크</label>
-    <div class="hint">링크 안의 ‘크리마 부정리뷰 모음’ 탭에 기록합니다.</div>
     <input id="sheetUrl" type="url" placeholder="Google 스프레드시트 주소를 입력하세요">
+    <label for="sheetTabName">시트 탭 이름 (선택)</label>
+    <div class="hint">비워두면 링크를 열었을 때 표시되는 탭에 기록합니다.</div>
+    <input id="sheetTabName" placeholder="예: 크리마 부정리뷰 모음">
     <button id="saveSheet" class="secondary">저장하기</button>
   </div>
   <div id="sheetSavedArea" class="hidden">
     <label>부정리뷰 기록 링크</label>
-    <div class="hint">기록 탭: 크리마 부정리뷰 모음</div>
     <div class="path"><a id="savedSheetUrl" class="link" href="#">저장된 링크 열기</a></div>
+    <div id="savedSheetTab" class="hint"></div>
     <button id="editSheet" class="secondary">수정</button>
   </div>
   <button id="run">적립금 지급</button>
