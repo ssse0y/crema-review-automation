@@ -19,7 +19,8 @@ const errorDetails = document.getElementById("errorDetails");
 const errorText = document.getElementById("errorText");
 const webAppUrl = document.getElementById("webAppUrl");
 const sheetApiKey = document.getElementById("sheetApiKey");
-const saveAuth = document.getElementById("saveAuth");
+const saveWebAppUrl = document.getElementById("saveWebAppUrl");
+const saveApiKey = document.getElementById("saveApiKey");
 const authState = document.getElementById("authState");
 
 function renderRunStatus(data) {
@@ -44,15 +45,24 @@ chrome.storage.local.get({sheetWebAppUrl: "", sheetApiKey: ""}).then(data => {
   authState.textContent = data.sheetWebAppUrl && data.sheetApiKey ? "권한 연결 정보가 저장되어 있습니다." : "배포 URL과 연결 키를 입력해주세요.";
 });
 
-saveAuth.addEventListener("click", async () => {
+saveWebAppUrl.addEventListener("click", async () => {
   const url = webAppUrl.value.trim();
-  const key = sheetApiKey.value.trim();
-  if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/.test(url) || !key) {
-    authState.textContent = "배포 URL과 연결 키를 확인해주세요.";
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/.test(url)) {
+    authState.textContent = "배포 URL을 확인해주세요. 주소 끝은 /exec여야 합니다.";
     return;
   }
-  await chrome.storage.local.set({sheetWebAppUrl: url, sheetApiKey: key});
-  authState.textContent = "Google Sheets 권한 연결 정보를 저장했습니다.";
+  await chrome.storage.local.set({sheetWebAppUrl: url});
+  authState.textContent = "Apps Script 배포 URL을 저장했습니다.";
+});
+
+saveApiKey.addEventListener("click", async () => {
+  const key = sheetApiKey.value.trim();
+  if (!key) {
+    authState.textContent = "연결 키를 입력해주세요.";
+    return;
+  }
+  await chrome.storage.local.set({sheetApiKey: key});
+  authState.textContent = "연결 키를 저장했습니다.";
 });
 
 function showSaved(value) {
