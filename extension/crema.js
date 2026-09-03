@@ -1,9 +1,10 @@
 (() => {
   const RUN_KEY = "cremaAutomationRunning";
   const ANGER = [
-    "화딱지", "화가", "짜증", "스트레스", "최악", "실망", "답답", "황당",
-    "다시는", "환불", "교환", "구림", "심하다", "안됩니다", "안 됩니다",
-    "못 쓰", "쓰지 못", "불량", "충격"
+    "구매하지 마", "사지 마", "사지마", "비추천", "절대 사지", "진짜 구매하지",
+    "화딱지", "화가", "화남", "짜증", "열받", "스트레스", "최악", "실망", "답답", "황당",
+    "다시는", "환불", "교환", "돈 아깝", "돈아깝", "구림", "심하다", "말도 안",
+    "안됩니다", "안 됩니다", "못 쓰", "못쓰", "쓰지 못", "불량", "충격", "후회"
   ];
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const visible = el => !!(el && el.getClientRects().length);
@@ -61,6 +62,134 @@
     return {id, date, product: candidates[0] || "", content: candidates.slice(1).join("\n") || raw, raw};
   }
 
+  function exactText(root, text) {
+    const wanted = compact(text);
+    return [...root.querySelectorAll("*")]
+      .find(el => visible(el) && compact(el.innerText) === wanted && el.children.length <= 2);
+  }
+
+  function modalRoot() {
+    const title = [...document.querySelectorAll("body *")]
+      .find(el => visible(el) && compact(el.innerText).startsWith("리뷰상세") && el.children.length <= 3);
+    if (!title) return null;
+    return title.closest("[role='dialog'],.modal,.ant-modal,.MuiDialog-root") || (() => {
+      let el = title;
+      for (let i = 0; i < 8 && el.parentElement; i++, el = el.parentElement) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 500 && r.height > 400 && r.width < innerWidth * .9) return el;
+      }
+      return title.parentElement;
+    })();
+  }
+
+  function scrollBox(modal) {
+    return [...modal.querySelectorAll("*")]
+      .filter(el => visible(el) && el.scrollHeight > el.clientHeight + 30)
+      .sort((a, b) => b.clientHeight - a.clientHeight)[0] || modal;
+  }
+
+  async function waitForModal() {
+    for (let i = 0; i < 30; i++) {
+      const modal = modalRoot();
+      if (modal) return modal;
+      await wait(200);
+    }
+    return null;
+  }
+
+  function labelValue(modal, label) {
+    const node = exactText(modal, label);
+    if (!node) return "";
+    const parentLines = (node.parentElement?.innerText || "").split(/\n+/).map(x => x.trim()).filter(Boolean);
+    const at = parentLines.findIndex(x => compact(x) === compact(label));
+    if (at >= 0 && parentLines[at + 1]) return parentLines[at + 1];
+    const next = node.nextElementSibling;
+    return (next?.innerText || next?.textContent || "").trim();
+  }
+
+  function sectionText(modal, heading) {
+    const node = exactText(modal, heading);
+    if (!node) return "";
+    let next = node.nextElementSibling;
+    if (!next && node.parentElement) next = node.parentElement.nextElementSibling;
+    return (next?.innerText || next?.textContent || "").trim();
+  }
+
+  function productName(modal) {
+    const change = exactText(modal, "상품 변경");
+    const box = change?.parentElement?.parentElement;
+    const lines = (box?.innerText || "").split(/\n+/).map(x => x.trim()).filter(Boolean);
+    return lines.find(x => !/^(상품 변경|리뷰 복사|부정 리뷰|상세보기|[\d,]+원|CREMA)/.test(x)) || "";
+  }
+
+  async function cropScreenshot(rect) {
+    const raw = await chrome.runtime.sendMessage({type: "captureRaw"});
+    if (!raw?.ok) throw new Error(raw?.error || "화면 캡처 실패");
+    const image = new Image();
+    image.src = raw.dataUrl;
+    await image.decode();
+    const scaleX = image.naturalWidth / innerWidth;
+    const scaleY = image.naturalHeight / innerHeight;
+    const x = Math.max(0, rect.left);
+    const y = Math.max(0, rect.top);
+    const width = Math.min(innerWidth - x, rect.width);
+    const height = Math.min(innerHeight - y, rect.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scaleX));
+    canvas.height = Math.max(1, Math.round(height * scaleY));
+    canvas.getContext("2d").drawImage(image, x * scaleX, y * scaleY, width * scaleX, height * scaleY, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  }
+
+  async function captureRange(scroller, modal, startNode, endNode, index, part) {
+    if (!startNode || !endNode) return 0;
+    const scrollerRect = scroller.getBoundingClientRect();
+    const startContent = scroller.scrollTop + startNode.getBoundingClientRect().top - scrollerRect.top;
+    const endContent = scroller.scrollTop + endNode.getBoundingClientRect().bottom - scrollerRect.top;
+    const available = Math.min(scroller.clientHeight, innerHeight - Math.max(0, scrollerRect.top)) - 8;
+    let offset = startContent;
+    let page = 1;
+    while (offset < endContent - 2) {
+      scroller.scrollTop = Math.max(0, offset - 4);
+      await wait(350);
+      const top = Math.max(scrollerRect.top, 0);
+      const height = Math.min(available, endContent - offset + 8);
+      const rect = {left: modal.getBoundingClientRect().left, top, width: modal.getBoundingClientRect().width, height};
+      const dataUrl = await cropScreenshot(rect);
+      await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page});
+      offset += Math.max(100, available - 12);
+      page++;
+    }
+    return page - 1;
+  }
+
+  async function captureVisibleRect(rect, index, part) {
+    const bounded = {
+      left: Math.max(0, rect.left),
+      top: Math.max(0, rect.top),
+      width: Math.min(innerWidth - Math.max(0, rect.left), rect.width),
+      height: Math.min(innerHeight - Math.max(0, rect.top), rect.height)
+    };
+    const dataUrl = await cropScreenshot(bounded);
+    await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page: 1});
+  }
+
+  function reviewDetailCell(row) {
+    const table = row.closest("table");
+    const headers = table ? [...table.querySelectorAll("thead th")] : [];
+    const index = headers.findIndex(th => compact(th.innerText).includes("리뷰상세내용"));
+    if (index >= 0 && row.cells?.[index]) return row.cells[index];
+    const cells = [...row.querySelectorAll("td")].filter(visible);
+    return cells.sort((a, b) => (b.innerText || "").length - (a.innerText || "").length)[0] || row;
+  }
+
+  async function closeModal(modal) {
+    const close = modal.querySelector("[aria-label*='close' i],[aria-label*='닫기'],button[class*='close' i]") ||
+      [...modal.querySelectorAll("button,[role=button]")].find(el => /^(×|✕|닫기)$/.test((el.innerText || "").trim()));
+    if (close) close.click();
+    await wait(500);
+  }
+
   async function run() {
     const marker = new URL(location.href).searchParams.get("crema_auto");
     const state = await chrome.storage.local.get([RUN_KEY, "liveEnabled"]);
@@ -94,14 +223,54 @@
     const statuses = [...document.querySelectorAll("body *")].filter(el => visible(el) && (el.innerText || "").trim() === "부정 리뷰");
     const rows = [];
     for (const status of statuses) {
-      const el = containerFor(status);
-      const row = parse(el);
-      if (isTwoStars(el) && ANGER.some(word => row.content.includes(word))) {
-        el.scrollIntoView({block: "center"});
-        await wait(400);
-        await chrome.runtime.sendMessage({type: "capture", index: rows.length + 1, label: "부정리뷰"});
+      const listRow = status.closest("tr") || containerFor(status);
+      const detailCell = reviewDetailCell(listRow);
+      detailCell.scrollIntoView({block: "center"});
+      await wait(250);
+      (detailCell.querySelector("a,button,[role=button]") || detailCell).click();
+      const modal = await waitForModal();
+      if (!modal) {
+        await log("리뷰 상세 내용 텍스트 클릭 후 팝업을 찾지 못함");
+        continue;
+      }
+      const scroller = scrollBox(modal);
+      scroller.scrollTop = 0;
+      await wait(300);
+      const bodyText = sectionText(modal, "리뷰 본문");
+      const modalText = modal.innerText || "";
+      const row = {
+        id: labelValue(modal, "작성자 아이디"),
+        date: labelValue(modal, "작성일"),
+        product: productName(modal),
+        content: bodyText,
+        raw: modalText
+      };
+      const ratingMatch = modalText.match(/(?:별점\s*)?([1-5])\s*\/\s*5|(?:별점|평점)\s*[:：]?\s*([1-5])(?:\.0)?\s*점?/);
+      const rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[2]) : 0;
+      const qualifies = rating >= 1 && rating <= 3 &&
+        ANGER.some(word => bodyText.includes(word));
+      if (qualifies) {
+        const index = rows.length + 1;
+        const idLabel = exactText(modal, "작성자 아이디");
+        const idBlock = idLabel?.parentElement || idLabel;
+        const modalRect = modal.getBoundingClientRect();
+        const idRect = idBlock?.getBoundingClientRect();
+        const topBottom = idRect ? idRect.bottom + 10 : Math.min(modalRect.bottom, modalRect.top + innerHeight * .55);
+        await captureVisibleRect({left: modalRect.left, top: modalRect.top, width: modalRect.width, height: topBottom - modalRect.top}, index, "상품및아이디");
+
+        const attachmentHeading = exactText(modal, "첨부 포토/동영상");
+        const reviewHeading = exactText(modal, "리뷰 본문");
+        if (attachmentHeading && reviewHeading) {
+          const attachmentEnd = reviewHeading.previousElementSibling || attachmentHeading.parentElement?.nextElementSibling || attachmentHeading;
+          await captureRange(scroller, modal, attachmentHeading, attachmentEnd, index, "첨부사진");
+        }
+        if (reviewHeading) {
+          const reviewCard = reviewHeading.nextElementSibling || reviewHeading.parentElement?.nextElementSibling || reviewHeading;
+          await captureRange(scroller, modal, reviewHeading, reviewCard, index, "리뷰본문");
+        }
         rows.push(row);
       }
+      await closeModal(modal);
     }
     await chrome.runtime.sendMessage({type: "reviews", rows});
     await log(`부정 리뷰 ${rows.length}건 캡처 및 로컬 기록 완료`);
