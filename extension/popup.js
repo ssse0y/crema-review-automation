@@ -14,6 +14,25 @@ const savedSheetUrl = document.getElementById("savedSheetUrl");
 const saveSheet = document.getElementById("saveSheet");
 const editSheet = document.getElementById("editSheet");
 const sheetTabName = document.getElementById("sheetTabName");
+const runResult = document.getElementById("runResult");
+const errorDetails = document.getElementById("errorDetails");
+const errorText = document.getElementById("errorText");
+
+function renderRunStatus(data) {
+  const state = data.lastRunStatus || "";
+  runResult.className = state;
+  runResult.textContent = data.lastRunMessage || "";
+  if (state === "error" && data.lastRunDetail) {
+    errorText.textContent = data.lastRunDetail;
+    errorDetails.classList.remove("hidden");
+  } else {
+    errorDetails.classList.add("hidden");
+    errorDetails.open = false;
+    errorText.textContent = "";
+  }
+}
+
+chrome.storage.local.get({lastRunStatus: "", lastRunMessage: "", lastRunDetail: ""}).then(renderRunStatus);
 
 function showSaved(value) {
   folder.value = value;
@@ -94,5 +113,8 @@ button.addEventListener("click", async () => {
   status.textContent = "관리자 화면을 여는 중입니다…";
   const result = await chrome.runtime.sendMessage({type: "runNow"});
   status.textContent = result?.ok ? "실행을 시작했습니다." : "실행하지 못했습니다.";
+  renderRunStatus(result?.ok
+    ? {lastRunStatus: "running", lastRunMessage: "적립금 지급 작업을 실행하고 있습니다.", lastRunDetail: ""}
+    : {lastRunStatus: "error", lastRunMessage: "작업을 시작하지 못했습니다.", lastRunDetail: result?.error || "알 수 없는 오류"});
   setTimeout(() => window.close(), 900);
 });

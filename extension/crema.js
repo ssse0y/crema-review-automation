@@ -9,6 +9,7 @@
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const visible = el => !!(el && el.getClientRects().length);
   const log = message => chrome.runtime.sendMessage({type: "log", message}).catch(() => {});
+  const setStatus = (status, message, detail = "") => chrome.runtime.sendMessage({type: "runStatus", status, message, detail}).catch(() => {});
   const compact = text => (text || "").replace(/\s+/g, "").trim();
 
   function findClickable(text) {
@@ -156,7 +157,8 @@
       const height = Math.min(available, endContent - offset + 8);
       const rect = {left: modal.getBoundingClientRect().left, top, width: modal.getBoundingClientRect().width, height};
       const dataUrl = await cropScreenshot(rect);
-      await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page});
+      const saved = await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page});
+      if (!saved?.ok) throw new Error(`${part} 캡처 저장 실패: ${saved?.error || "알 수 없는 오류"}`);
       offset += Math.max(100, available - 12);
       page++;
     }
@@ -171,7 +173,8 @@
       height: Math.min(innerHeight - Math.max(0, rect.top), rect.height)
     };
     const dataUrl = await cropScreenshot(bounded);
-    await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page: 1});
+    const saved = await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page: 1});
+    if (!saved?.ok) throw new Error(`${part} 캡처 저장 실패: ${saved?.error || "알 수 없는 오류"}`);
   }
 
   function reviewDetailCell(row) {
@@ -203,6 +206,7 @@
       const password = document.querySelector("input[type='password']");
       if (password && visible(password)) {
         await log("기존 Chrome의 크리마 로그인이 필요하여 중단");
+        await setStatus("error", "적립금 지급을 시작하지 못했습니다.", "크리마 로그인이 만료되었습니다. 크리마에 다시 로그인한 후 실행해주세요.");
         await chrome.storage.local.set({[RUN_KEY]: false});
       }
       return;
@@ -217,6 +221,7 @@
       await log(`메뉴 진단 URL=${location.href} FRAME=${window === top ? "top" : "child"} LABELS=${JSON.stringify(labels)}`);
       await chrome.runtime.sendMessage({type: "capture", index: 0, label: "메뉴탐색오류"});
       await log("메뉴를 찾지 못해 지급 중단");
+      await setStatus("error", "적립금 지급 화면으로 이동하지 못했습니다.", `현재 주소: ${location.href}\n크리마 관리자 화면 구조가 변경되었거나 로그인이 만료되었을 수 있습니다.`);
       await chrome.storage.local.set({[RUN_KEY]: false});
       return;
     }
@@ -272,11 +277,13 @@
       }
       await closeModal(modal);
     }
-    await chrome.runtime.sendMessage({type: "reviews", rows});
+    const reviewSave = await chrome.runtime.sendMessage({type: "reviews", rows});
+    if (!reviewSave?.ok) throw new Error(`리뷰 기록 파일 저장 실패: ${reviewSave?.error || "알 수 없는 오류"}`);
     await log(`부정 리뷰 ${rows.length}건 캡처 및 로컬 기록 완료`);
     if (!state.liveEnabled) {
       await chrome.runtime.sendMessage({type: "capture", index: 0, label: "지급전검증"});
       await log("최초 검증 전이므로 실제 지급 중단");
+      await setStatus("success", "캡처 및 저장 점검이 완료되었습니다.", "");
       await chrome.storage.local.set({[RUN_KEY]: false});
       return;
     }
@@ -285,6 +292,7 @@
   }
   run().catch(async error => {
     await log(`오류로 지급 중단: ${error}`);
+    await setStatus("error", "캡처본 저장 또는 리뷰 처리 중 오류가 발생했습니다.", String(error?.stack || error));
     await chrome.storage.local.set({[RUN_KEY]: false});
   });
 })();
