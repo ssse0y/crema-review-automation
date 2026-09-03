@@ -7,6 +7,12 @@ const savedPath = document.getElementById("savedPath");
 const save = document.getElementById("save");
 const edit = document.getElementById("edit");
 const openDownloads = document.getElementById("openDownloads");
+const sheetEditArea = document.getElementById("sheetEditArea");
+const sheetSavedArea = document.getElementById("sheetSavedArea");
+const sheetUrl = document.getElementById("sheetUrl");
+const savedSheetUrl = document.getElementById("savedSheetUrl");
+const saveSheet = document.getElementById("saveSheet");
+const editSheet = document.getElementById("editSheet");
 
 function showSaved(value) {
   folder.value = value;
@@ -38,6 +44,41 @@ edit.addEventListener("click", () => {
 openDownloads.addEventListener("click", async () => {
   await chrome.tabs.create({url: "chrome://settings/downloads"});
   window.close();
+});
+
+function showSavedSheet(value) {
+  sheetUrl.value = value;
+  savedSheetUrl.href = value;
+  savedSheetUrl.title = value;
+  sheetEditArea.classList.add("hidden");
+  sheetSavedArea.classList.remove("hidden");
+}
+
+chrome.storage.local.get({reviewSheetUrl: "", reviewSheetUrlSaved: false}).then(data => {
+  sheetUrl.value = data.reviewSheetUrl;
+  if (data.reviewSheetUrlSaved && data.reviewSheetUrl) showSavedSheet(data.reviewSheetUrl);
+});
+
+saveSheet.addEventListener("click", async () => {
+  const value = sheetUrl.value.trim();
+  if (!/^https:\/\/docs\.google\.com\/spreadsheets\//.test(value)) {
+    status.textContent = "Google 스프레드시트 주소를 확인해주세요.";
+    return;
+  }
+  await chrome.storage.local.set({reviewSheetUrl: value, reviewSheetUrlSaved: true});
+  showSavedSheet(value);
+  status.textContent = "부정리뷰 기록 링크를 저장했습니다.";
+});
+
+editSheet.addEventListener("click", () => {
+  sheetSavedArea.classList.add("hidden");
+  sheetEditArea.classList.remove("hidden");
+  sheetUrl.focus();
+});
+
+savedSheetUrl.addEventListener("click", async event => {
+  event.preventDefault();
+  if (savedSheetUrl.href) await chrome.tabs.create({url: savedSheetUrl.href});
 });
 
 button.addEventListener("click", async () => {

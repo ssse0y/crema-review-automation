@@ -18,6 +18,7 @@
     details[open] summary::before { transform: rotate(90deg); }
     details ol { margin: 9px 0; padding-left: 22px; color: #5f6368; line-height: 1.55; }
     .settings { padding: 8px; background: #f1f3f4; color: #3c4043; }
+    .link { color: #1967d2; text-decoration: none; }
     .hidden { display: none; }
     button:disabled { background: #9aa0a6; cursor: default; }
     #status { margin-top: 10px; min-height: 18px; font-size: 12px; color: #137333; }
@@ -45,6 +46,16 @@
     </ol>
     <button id="openDownloads" class="settings">다운로드 설정 열기</button>
   </details>
+  <div id="sheetEditArea">
+    <label for="sheetUrl">부정리뷰 기록 링크</label>
+    <input id="sheetUrl" type="url" placeholder="Google 스프레드시트 주소를 입력하세요">
+    <button id="saveSheet" class="secondary">저장하기</button>
+  </div>
+  <div id="sheetSavedArea" class="hidden">
+    <label>부정리뷰 기록 링크</label>
+    <div class="path"><a id="savedSheetUrl" class="link" href="#">저장된 링크 열기</a></div>
+    <button id="editSheet" class="secondary">수정</button>
+  </div>
   <button id="run">적립금 지급</button>
   <div id="status"></div>
   <script src="popup.js"></script>
