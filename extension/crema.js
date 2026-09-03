@@ -66,7 +66,18 @@
       if (checkbox && visible(checkbox)) return checkbox;
     }
     const header = [...document.querySelectorAll("thead")].find(visible);
-    return header?.querySelector("input[type='checkbox'],[role='checkbox']") || null;
+    const headerCheckbox = header?.querySelector("input[type='checkbox'],[role='checkbox']");
+    if (headerCheckbox) return headerCheckbox;
+    // 크리마가 표를 div 기반으로 렌더링하는 경우 화면에서 가장 위에 있는
+    // 목록용 체크박스를 전체 선택 체크박스로 사용한다.
+    const candidates = [...document.querySelectorAll("input[type='checkbox'],[role='checkbox'],label")]
+      .filter(el => {
+        const target = el.matches("label") ? el.querySelector("input[type='checkbox']") : el;
+        const rect = el.getBoundingClientRect();
+        return target && visible(el) && rect.width >= 12 && rect.height >= 12 && rect.top > 60;
+      })
+      .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+    return candidates[0] || null;
   }
 
   async function payAllRewards() {
@@ -356,15 +367,7 @@
     const reviewSave = await chrome.runtime.sendMessage({type: "reviews", rows});
     if (!reviewSave?.ok) throw new Error(`시트 기록 대기 데이터 저장 실패: ${reviewSave?.error || "알 수 없는 오류"}`);
     await log(`부정 리뷰 ${rows.length}건 캡처 및 시트 기록 대기 저장 완료`);
-    let sheetSummary = "기록할 부정 리뷰가 없습니다.";
-    if (rows.length) {
-      currentStage = "Google Sheets 기록";
-      const sheetWrite = await chrome.runtime.sendMessage({type: "writeSheet", rows});
-      if (!sheetWrite?.ok) throw new Error(sheetWrite?.error || "Google Sheets 기록 실패");
-      sheetSummary = `스프레드시트 ${sheetWrite.inserted || 0}건 기록, ${sheetWrite.skipped || 0}건 중복 제외`;
-      await log(sheetSummary);
-    }
-    await setStatus("success", `적립금 지급과 부정 리뷰 ${rows.length}건 처리가 완료되었습니다.`, sheetSummary);
+    await setStatus("success", `적립금 지급과 부정 리뷰 ${rows.length}건의 캡처 저장이 완료되었습니다.`, rows.length ? "시트 기록은 현재 실행하지 않습니다." : "캡처 조건을 만족하는 부정 리뷰가 없습니다.");
     await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
   }
   run().catch(async error => {

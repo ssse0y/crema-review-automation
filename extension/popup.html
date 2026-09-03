@@ -24,6 +24,7 @@
     .inline-row input, .inline-row .path { flex: 1; min-width: 0; margin-bottom: 0; }
     .compact { width: auto; flex: 0 0 auto; margin: 0; padding: 8px 11px; font-size: 12px; white-space: nowrap; }
     .hidden { display: none; }
+    .sheet-feature { display: none; }
     button:disabled { background: #9aa0a6; cursor: default; }
     #run { padding: 13px; background: #16a34a; font-size: 14px; box-shadow: 0 2px 5px rgba(22, 163, 74, .28); }
     #run:hover { background: #15803d; }
@@ -63,7 +64,7 @@
     </ol>
     <button id="openDownloads" class="settings">다운로드 설정 열기</button>
   </details>
-  <div id="sheetEditArea">
+  <div id="sheetEditArea" class="sheet-feature">
     <label for="sheetUrl">부정리뷰 기록 링크</label>
     <div class="inline-row">
       <input id="sheetUrl" type="url" placeholder="Google 스프레드시트 주소">
@@ -72,14 +73,14 @@
     <label for="sheetTabName">시트 탭 이름 (선택)</label>
     <input id="sheetTabName" placeholder="예: 크리마 부정리뷰 모음">
   </div>
-  <div id="sheetSavedArea" class="hidden">
+  <div id="sheetSavedArea" class="hidden sheet-feature">
     <label>부정리뷰 기록 링크</label>
     <div class="inline-row">
       <div class="path"><a id="savedSheetUrl" class="link" href="#">저장된 링크 열기</a></div>
       <button id="editSheet" class="secondary compact">수정</button>
     </div>
   </div>
-  <details id="sheetAuth">
+  <details id="sheetAuth" class="sheet-feature">
     <summary>Google Sheets 권한 연결</summary>
     <label for="webAppUrl">Apps Script 배포 URL</label>
     <input id="webAppUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
