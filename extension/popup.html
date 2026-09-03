@@ -20,6 +20,9 @@
     .settings { padding: 8px; background: #f1f3f4; color: #3c4043; }
     .link { color: #1967d2; text-decoration: none; }
     .hint { margin: -5px 0 9px; color: #5f6368; font-size: 11px; line-height: 1.4; }
+    .inline-row { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
+    .inline-row input, .inline-row .path { flex: 1; min-width: 0; margin-bottom: 0; }
+    .compact { width: auto; flex: 0 0 auto; margin: 0; padding: 8px 11px; font-size: 12px; white-space: nowrap; }
     .hidden { display: none; }
     button:disabled { background: #9aa0a6; cursor: default; }
     #run { padding: 13px; background: #16a34a; font-size: 14px; box-shadow: 0 2px 5px rgba(22, 163, 74, .28); }
@@ -32,13 +35,17 @@
   <p>처음에는 Chrome 기본 다운로드 폴더에 저장됩니다. 다른 폴더에 모아두려면 아래의 수정 버튼을 눌러 폴더 이름을 입력하세요.</p>
   <div id="editArea">
     <label for="folder">부정리뷰 캡처 저장 경로</label>
-    <input id="folder" value="" placeholder="예: 부정리뷰 또는 크리마/부정리뷰">
-    <button id="save" class="secondary">저장하기</button>
+    <div class="inline-row">
+      <input id="folder" value="" placeholder="예: 부정리뷰">
+      <button id="save" class="secondary compact">저장</button>
+    </div>
   </div>
   <div id="savedArea" class="hidden">
     <label>부정리뷰 캡처 저장 경로</label>
-    <div id="savedPath" class="path"></div>
-    <button id="edit" class="secondary">수정</button>
+    <div class="inline-row">
+      <div id="savedPath" class="path"></div>
+      <button id="edit" class="secondary compact">수정</button>
+    </div>
   </div>
   <details>
     <summary>Chrome 기본 다운로드 폴더 확인 방법</summary>
@@ -51,17 +58,21 @@
   </details>
   <div id="sheetEditArea">
     <label for="sheetUrl">부정리뷰 기록 링크</label>
-    <input id="sheetUrl" type="url" placeholder="Google 스프레드시트 주소를 입력하세요">
+    <div class="inline-row">
+      <input id="sheetUrl" type="url" placeholder="Google 스프레드시트 주소">
+      <button id="saveSheet" class="secondary compact">저장</button>
+    </div>
     <label for="sheetTabName">시트 탭 이름 (선택)</label>
     <div class="hint">비워두면 링크를 열었을 때 표시되는 탭에 기록합니다.</div>
     <input id="sheetTabName" placeholder="예: 크리마 부정리뷰 모음">
-    <button id="saveSheet" class="secondary">저장하기</button>
   </div>
   <div id="sheetSavedArea" class="hidden">
     <label>부정리뷰 기록 링크</label>
-    <div class="path"><a id="savedSheetUrl" class="link" href="#">저장된 링크 열기</a></div>
+    <div class="inline-row">
+      <div class="path"><a id="savedSheetUrl" class="link" href="#">저장된 링크 열기</a></div>
+      <button id="editSheet" class="secondary compact">수정</button>
+    </div>
     <div id="savedSheetTab" class="hint"></div>
-    <button id="editSheet" class="secondary">수정</button>
   </div>
   <button id="run">적립금 지급</button>
   <div id="status"></div>
