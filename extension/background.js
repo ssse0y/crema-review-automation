@@ -10,11 +10,6 @@ async function settings() {
   return {captureFolder: safeFolder(data.captureFolder)};
 }
 
-async function downloadText(filename, value) {
-  const url = `data:application/json;charset=utf-8,${encodeURIComponent(value)}`;
-  return chrome.downloads.download({url, filename, conflictAction: "overwrite", saveAs: false});
-}
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message.type === "runNow") {
@@ -72,11 +67,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "reviews") {
-      const {captureFolder} = await settings();
-      const date = new Date().toLocaleDateString("sv-SE");
-      const filename = `${captureFolder ? captureFolder + "/" : ""}${date}_부정리뷰.json`;
-      await downloadText(filename, JSON.stringify(message.rows || [], null, 2));
-      sendResponse({ok: true, filename});
+      await chrome.storage.local.set({
+        pendingReviewRows: message.rows || [],
+        pendingReviewSavedAt: new Date().toISOString()
+      });
+      sendResponse({ok: true, stored: "pendingReviewRows"});
       return;
     }
   })().catch(async error => {

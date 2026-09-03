@@ -278,10 +278,9 @@
       await closeModal(modal);
     }
     const reviewSave = await chrome.runtime.sendMessage({type: "reviews", rows});
-    if (!reviewSave?.ok) throw new Error(`리뷰 기록 파일 저장 실패: ${reviewSave?.error || "알 수 없는 오류"}`);
-    await log(`부정 리뷰 ${rows.length}건 캡처 및 로컬 기록 완료`);
+    if (!reviewSave?.ok) throw new Error(`시트 기록 대기 데이터 저장 실패: ${reviewSave?.error || "알 수 없는 오류"}`);
+    await log(`부정 리뷰 ${rows.length}건 캡처 및 시트 기록 대기 저장 완료`);
     if (!state.liveEnabled) {
-      await chrome.runtime.sendMessage({type: "capture", index: 0, label: "지급전검증"});
       await log("최초 검증 전이므로 실제 지급 중단");
       await setStatus("success", "캡처 및 저장 점검이 완료되었습니다.", "");
       await chrome.storage.local.set({[RUN_KEY]: false});
