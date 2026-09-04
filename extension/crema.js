@@ -241,6 +241,12 @@
   function labelValue(modal, label) {
     const node = exactText(modal, label);
     if (!node) return "";
+    const datum = node.closest('[class*="AppDataList__datum"]');
+    if (datum) {
+      const lines = (datum.innerText || "").split(/\n+/).map(x => x.trim()).filter(Boolean);
+      const at = lines.findIndex(x => compact(x) === compact(label));
+      if (at >= 0 && lines[at + 1]) return lines[at + 1];
+    }
     const parentLines = (node.parentElement?.innerText || "").split(/\n+/).map(x => x.trim()).filter(Boolean);
     const at = parentLines.findIndex(x => compact(x) === compact(label));
     if (at >= 0 && parentLines[at + 1]) return parentLines[at + 1];
@@ -305,10 +311,25 @@
   }
 
   function productName(modal) {
+    const named = modal.querySelector('[class*="ReviewReviewDialog__product-name"]');
+    if (named) return (named.innerText || named.textContent || "").trim();
     const change = exactText(modal, "상품 변경");
     const box = change?.parentElement?.parentElement;
     const lines = (box?.innerText || "").split(/\n+/).map(x => x.trim()).filter(Boolean);
     return lines.find(x => !/^(상품 변경|리뷰 복사|부정 리뷰|상세보기|[\d,]+원|CREMA)/.test(x)) || "";
+  }
+
+  function reviewContent(modal) {
+    const card = sectionCard(modal, "리뷰 본문");
+    const highlighted = card?.querySelector('[class*="AppTextWithHighlights"]');
+    const pre = highlighted || card?.querySelector("pre") || null;
+    return (pre?.innerText || pre?.textContent || sectionText(modal, "리뷰 본문") || "").trim();
+  }
+
+  function reviewDate(modal) {
+    const raw = labelValue(modal, "작성일");
+    const match = raw.match(/(20\d{2})\D+(\d{1,2})\D+(\d{1,2})/);
+    return match ? `${match[1]}. ${Number(match[2])}. ${Number(match[3])}.` : raw;
   }
 
   async function cropScreenshot(rect) {
@@ -496,11 +517,11 @@
       }
       const scroller = scrollBox(modal);
       await resetModalToTop(modal);
-      const bodyText = sectionText(modal, "리뷰 본문");
+      const bodyText = reviewContent(modal);
       const modalText = modal.innerText || "";
       const row = {
         id: labelValue(modal, "작성자 아이디"),
-        date: labelValue(modal, "작성일"),
+        date: reviewDate(modal),
         product: productName(modal),
         content: bodyText,
         raw: modalText
