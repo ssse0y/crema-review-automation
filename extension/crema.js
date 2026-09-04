@@ -564,7 +564,7 @@
       const sheetResult = await chrome.runtime.sendMessage({type: "writeSheet", rows: [row]});
       if (!sheetResult?.ok) throw new Error(`Google Sheets 기록 실패: ${sheetResult?.error || "알 수 없는 오류"}`);
       await closeModal(modal);
-      await setStatus("success", `캡처·저장·시트 기록 테스트가 완료되었습니다. PNG ${captureCount}개, 시트 ${sheetResult.inserted || 0}행`, sheetResult.skipped ? "같은 리뷰가 이미 기록되어 시트 중복 추가는 제외했습니다. 적립금은 지급하지 않았습니다." : "적립금은 지급하지 않았습니다.");
+      await setStatus("success", `캡처·시트 기록 테스트가 완료되었습니다. PNG ${captureCount}개 임시 보관, 시트 ${sheetResult.inserted || 0}행`, sheetResult.skipped ? "같은 리뷰가 이미 기록되어 시트 중복 추가는 제외했습니다. 완료 알림의 버튼으로 캡처본을 내려받을 수 있습니다. 적립금은 지급하지 않았습니다." : "완료 알림의 버튼으로 캡처본을 내려받을 수 있습니다. 적립금은 지급하지 않았습니다.");
       await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
       return;
     }
