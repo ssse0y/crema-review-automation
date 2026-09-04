@@ -283,6 +283,7 @@
     const dataUrl = await cropScreenshot(bounded);
     const saved = await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page: 1});
     if (!saved?.ok) throw new Error(`${part} 캡처 저장 실패: ${saved?.error || "알 수 없는 오류"}`);
+    return 1;
   }
 
   function reviewDetailCell(row) {
@@ -376,19 +377,20 @@
       const modalRect = modal.getBoundingClientRect();
       const idRect = idBlock?.getBoundingClientRect();
       const topBottom = idRect ? idRect.bottom + 10 : Math.min(modalRect.bottom, modalRect.top + innerHeight * .55);
-      await captureVisibleRect({left: modalRect.left, top: modalRect.top, width: modalRect.width, height: topBottom - modalRect.top}, 1, "상품및아이디_테스트");
+      let captureCount = await captureVisibleRect({left: modalRect.left, top: modalRect.top, width: modalRect.width, height: topBottom - modalRect.top}, 1, "상품및아이디_테스트");
       const attachmentHeading = exactText(modal, "첨부 포토/동영상");
       const reviewHeading = exactText(modal, "리뷰 본문");
       if (attachmentHeading && reviewHeading) {
         const attachmentEnd = reviewHeading.previousElementSibling || attachmentHeading.parentElement?.nextElementSibling || attachmentHeading;
-        await captureRange(scroller, modal, attachmentHeading, attachmentEnd, 1, "첨부사진_테스트");
+        captureCount += await captureRange(scroller, modal, attachmentHeading, attachmentEnd, 1, "첨부사진_테스트");
       }
       if (reviewHeading) {
         const reviewCard = reviewHeading.nextElementSibling || reviewHeading.parentElement?.nextElementSibling || reviewHeading;
-        await captureRange(scroller, modal, reviewHeading, reviewCard, 1, "리뷰본문_테스트");
+        captureCount += await captureRange(scroller, modal, reviewHeading, reviewCard, 1, "리뷰본문_테스트");
       }
       await closeModal(modal);
-      await setStatus("success", "첫 번째 리뷰 캡처 테스트가 완료되었습니다.", "스프레드시트 기록과 적립금 지급은 실행하지 않았습니다.");
+      if (captureCount < 2) throw new Error(`테스트 캡처가 ${captureCount}개만 저장되어 예상한 상품·아이디 및 리뷰 본문 캡처를 완료하지 못했습니다.`);
+      await setStatus("success", `첫 번째 리뷰 캡처 테스트가 완료되었습니다. PNG ${captureCount}개를 저장했습니다.`, "스프레드시트 기록과 적립금 지급은 실행하지 않았습니다.");
       await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
       return;
     }
