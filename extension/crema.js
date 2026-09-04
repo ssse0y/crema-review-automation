@@ -559,6 +559,36 @@
       await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
       return;
     }
+    if (phase === "sheet_test") {
+      currentStage = "첫 번째 리뷰 스프레드시트 기록 테스트";
+      let message = null;
+      for (let i = 0; i < 30 && !message; i++) {
+        message = [...document.querySelectorAll('span[class*="ReviewReviewsReviewCell__message"]')].find(visible) || null;
+        if (!message) await wait(200);
+      }
+      if (!message) throw new Error("시트 테스트에 사용할 첫 번째 리뷰를 찾지 못했습니다.");
+      message.scrollIntoView({block: "center"});
+      await wait(250);
+      message.click();
+      let modal = await waitForModal();
+      if (!modal) throw new Error("첫 번째 리뷰 상세 팝업이 화면에 나타나지 않았습니다.");
+      modal = await waitForReviewCaptureNodes(modal);
+      const row = {
+        id: labelValue(modal, "작성자 아이디"),
+        date: reviewDate(modal),
+        product: productName(modal),
+        content: reviewContent(modal)
+      };
+      if (!row.id || !row.date || !row.product || !row.content) {
+        throw new Error(`시트 기록값 추출 실패: ${JSON.stringify(row)}`);
+      }
+      const result = await chrome.runtime.sendMessage({type: "writeSheet", rows: [row]});
+      if (!result?.ok) throw new Error(`Google Sheets 기록 실패: ${result?.error || "알 수 없는 오류"}`);
+      await closeModal(modal);
+      await setStatus("success", `첫 번째 리뷰 시트 기록 테스트가 완료되었습니다. ${result.inserted || 0}행 기록`, result.skipped ? "이미 같은 리뷰가 있어 중복 기록하지 않았습니다." : `${row.product} / ${row.id}`);
+      await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
+      return;
+    }
     if (phase === "payment") {
       const payment = await payoutCurrentTab();
       await setStatus("success", payment.paid ? "적립금 지급이 완료되었습니다." : "지급이 필요한 리뷰가 없습니다.", "");

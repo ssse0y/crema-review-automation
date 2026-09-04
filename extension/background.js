@@ -70,6 +70,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ok: true});
       return;
     }
+    if (message.type === "runSheetTest") {
+      await chrome.storage.local.set({
+        cremaAutomationRunning: true,
+        cremaAutomationPhase: "sheet_test",
+        lastRunStatus: "running",
+        lastRunMessage: "첫 번째 리뷰를 스프레드시트에 기록하고 있습니다.",
+        lastRunDetail: "",
+        lastRunAt: new Date().toISOString()
+      });
+      const stamp = Date.now();
+      await chrome.tabs.create({url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
+      sendResponse({ok: true});
+      return;
+    }
     if (message.type === "runStatus") {
       await chrome.storage.local.set({
         lastRunStatus: message.status,

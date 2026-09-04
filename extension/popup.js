@@ -154,21 +154,10 @@ captureTest.addEventListener("click", async () => {
 
 sheetTest.addEventListener("click", async () => {
   sheetTest.disabled = true;
-  const now = new Date();
-  const date = `${now.getFullYear()}. ${now.getMonth() + 1}. ${now.getDate()}.`;
-  status.textContent = "스프레드시트에 테스트 행을 기록하고 있습니다…";
-  const result = await chrome.runtime.sendMessage({
-    type: "writeSheet",
-    rows: [{
-      id: `TEST-${Date.now()}`,
-      date,
-      product: "[테스트] 크리마 자동화",
-      content: "Google Sheets 기록 연결 테스트입니다. 확인 후 이 행을 삭제해주세요."
-    }]
-  });
+  status.textContent = "첫 번째 리뷰의 실제 내용을 기록하고 있습니다…";
+  const result = await chrome.runtime.sendMessage({type: "runSheetTest"});
   if (result?.ok) {
-    status.textContent = `스프레드시트 입력 테스트 성공: ${result.inserted || 0}행 기록`;
-    renderRunStatus({lastRunStatus: "success", lastRunMessage: "스프레드시트 입력 테스트가 완료되었습니다.", lastRunDetail: ""});
+    setTimeout(() => window.close(), 700);
   } else {
     renderRunStatus({lastRunStatus: "error", lastRunMessage: "스프레드시트 입력 테스트에 실패했습니다.", lastRunDetail: result?.error || "알 수 없는 오류"});
     status.textContent = "";
