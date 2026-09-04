@@ -5,6 +5,10 @@ function safeFolder(value) {
     .trim();
 }
 
+function safeFilenamePart(value) {
+  return String(value || "").replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, "_").slice(0, 60);
+}
+
 let lastCaptureAt = 0;
 async function waitForCaptureSlot() {
   const remaining = 650 - (Date.now() - lastCaptureAt);
@@ -117,7 +121,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "saveCapture") {
       const {captureFolder} = await settings();
       const date = new Date().toLocaleDateString("sv-SE");
-      const filename = `${captureFolder ? captureFolder + "/" : ""}${date}_${String(message.index).padStart(2, "0")}_${message.part}${message.page > 1 ? `_${String(message.page).padStart(2, "0")}` : ""}.png`;
+      const reviewId = safeFilenamePart(message.reviewId);
+      const identity = reviewId ? `${reviewId}_` : "";
+      const filename = `${captureFolder ? captureFolder + "/" : ""}${date}_${identity}${String(message.index).padStart(2, "0")}_${message.part}${message.page > 1 ? `_${String(message.page).padStart(2, "0")}` : ""}.png`;
       const downloadId = await chrome.downloads.download({url: message.dataUrl, filename, conflictAction: "uniquify", saveAs: false});
       const completed = await waitForDownload(downloadId);
       sendResponse({ok: true, downloadId, filename, savedPath: completed.filename});
