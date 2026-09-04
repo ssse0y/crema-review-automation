@@ -204,6 +204,16 @@
       .sort((a, b) => b.clientHeight - a.clientHeight)[0] || modal;
   }
 
+  async function setModalScroll(scroller, top) {
+    const target = Math.max(0, top);
+    for (let i = 0; i < 3; i++) {
+      scroller.scrollTo({top: target, behavior: "auto"});
+      scroller.scrollTop = target;
+      scroller.dispatchEvent(new Event("scroll", {bubbles: true}));
+      await wait(250);
+    }
+  }
+
   async function waitForModal() {
     for (let i = 0; i < 30; i++) {
       const modal = modalRoot();
@@ -284,8 +294,7 @@
     let offset = startContent;
     let page = 1;
     while (offset < endContent - 2) {
-      scroller.scrollTop = Math.max(0, offset - 4);
-      await wait(350);
+      await setModalScroll(scroller, Math.max(0, offset - 4));
       const top = Math.max(scrollerRect.top, 0);
       const height = Math.min(available, endContent - offset + 8);
       const rect = {left: modal.getBoundingClientRect().left, top, width: modal.getBoundingClientRect().width, height};
@@ -397,8 +406,7 @@
       const modal = await waitForModal();
       if (!modal) throw new Error("첫 번째 리뷰 상세 팝업이 화면에 나타나지 않았습니다.");
       const scroller = scrollBox(modal);
-      scroller.scrollTop = 0;
-      await wait(300);
+      await setModalScroll(scroller, 0);
       const idLabel = exactText(modal, "작성자 아이디");
       const idBlock = idLabel?.parentElement || idLabel;
       const modalRect = modal.getBoundingClientRect();
@@ -448,8 +456,7 @@
         continue;
       }
       const scroller = scrollBox(modal);
-      scroller.scrollTop = 0;
-      await wait(300);
+      await setModalScroll(scroller, 0);
       const bodyText = sectionText(modal, "리뷰 본문");
       const modalText = modal.innerText || "";
       const row = {
