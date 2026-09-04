@@ -5,6 +5,13 @@ function safeFolder(value) {
     .trim();
 }
 
+let lastCaptureAt = 0;
+async function waitForCaptureSlot() {
+  const remaining = 650 - (Date.now() - lastCaptureAt);
+  if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining));
+  lastCaptureAt = Date.now();
+}
+
 async function settings() {
   const data = await chrome.storage.local.get({captureFolder: ""});
   return {captureFolder: safeFolder(data.captureFolder)};
@@ -58,6 +65,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "capture") {
+      await waitForCaptureSlot();
       const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, {format: "png"});
       const {captureFolder} = await settings();
       const date = new Date().toLocaleDateString("sv-SE");
@@ -68,6 +76,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "captureRaw") {
+      await waitForCaptureSlot();
       const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, {format: "png"});
       sendResponse({ok: true, dataUrl});
       return;
