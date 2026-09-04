@@ -124,13 +124,13 @@
       .filter(el => visible(el) && compact(el.innerText) === "적립금지급" && !el.disabled && el.getAttribute("aria-disabled") !== "true")
       .sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
     if (!finalPayButton) throw new Error("최종 지급 팝업의 파란 ‘적립금 지급’ 버튼을 찾지 못했습니다.");
-    // Chrome 입력 연결 후 페이지 영역에서 버튼을 포커스하고 원시 Enter를 보낸다.
+    // Chrome이 실행 시점의 버튼 위치를 직접 계산해 실제 마우스 클릭을 보낸다.
     finalPayButton.scrollIntoView({block: "center", inline: "center"});
     await wait(200);
     const marker = `crema-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     finalPayButton.setAttribute("data-crema-final-pay", marker);
     const pageClick = await chrome.runtime.sendMessage({
-      type: "trustedButtonEnter",
+      type: "trustedButtonClick",
       marker
     });
     finalPayButton.removeAttribute("data-crema-final-pay");

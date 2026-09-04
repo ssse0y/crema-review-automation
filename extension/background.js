@@ -58,33 +58,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ok: true, dataUrl});
       return;
     }
-    if (message.type === "trustedButtonEnter") {
+    if (message.type === "trustedButtonClick") {
       if (!sender.tab?.id) throw new Error("클릭할 크리마 탭을 찾지 못했습니다.");
       const target = {tabId: sender.tab.id};
       let attached = false;
       try {
         await chrome.debugger.attach(target, "1.3");
         attached = true;
-        const results = await chrome.scripting.executeScript({
-          target: {tabId: sender.tab.id, frameIds: [sender.frameId]},
-          world: "MAIN",
-          func: marker => {
-            const button = document.querySelector(`[data-crema-final-pay="${marker}"]`);
-            if (!button) return {ok: false, error: "페이지 실행 영역에서 최종 지급 버튼을 찾지 못했습니다."};
-            button.focus({preventScroll: true});
-            return {ok: document.activeElement === button, tag: button.tagName, type: button.type || ""};
-          },
-          args: [message.marker]
+        const evaluated = await chrome.debugger.sendCommand(target, "Runtime.evaluate", {
+          expression: `document.querySelector('[data-crema-final-pay="${message.marker}"]')`,
+          returnByValue: false
         });
-        const focus = results[0]?.result;
-        if (!focus?.ok) throw new Error(focus?.error || "최종 지급 버튼에 포커스를 지정하지 못했습니다.");
-        await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
-          type: "rawKeyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13
+        const objectId = evaluated?.result?.objectId;
+        if (!objectId) throw new Error("Chrome 페이지 영역에서 최종 지급 버튼을 찾지 못했습니다.");
+        await chrome.debugger.sendCommand(target, "DOM.scrollIntoViewIfNeeded", {objectId});
+        const box = await chrome.debugger.sendCommand(target, "DOM.getBoxModel", {objectId});
+        const quad = box?.model?.border;
+        if (!quad || quad.length < 8) throw new Error("최종 지급 버튼의 화면 위치를 확인하지 못했습니다.");
+        const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4;
+        const y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4;
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mouseMoved", x, y
         });
-        await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
-          type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mousePressed", x, y, button: "left", clickCount: 1
         });
-        sendResponse({ok: true, info: focus});
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mouseReleased", x, y, button: "left", clickCount: 1
+        });
+        sendResponse({ok: true, info: {method: "dynamic-button-position"}});
       } finally {
         if (attached) await chrome.debugger.detach(target).catch(() => {});
       }
