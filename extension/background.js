@@ -12,6 +12,18 @@ async function waitForCaptureSlot() {
   lastCaptureAt = Date.now();
 }
 
+async function waitForDownload(downloadId, timeout = 30000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const items = await chrome.downloads.search({id: downloadId});
+    const item = items[0];
+    if (item?.state === "complete") return item;
+    if (item?.state === "interrupted") throw new Error(`파일 저장이 중단되었습니다: ${item.error || "원인 미상"}`);
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  throw new Error("파일 저장 완료를 30초 안에 확인하지 못했습니다.");
+}
+
 async function settings() {
   const data = await chrome.storage.local.get({captureFolder: ""});
   return {captureFolder: safeFolder(data.captureFolder)};
@@ -72,7 +84,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const suffix = message.index ? `_${String(message.index).padStart(2, "0")}` : `_${message.label || "진단"}`;
       const filename = `${captureFolder ? captureFolder + "/" : ""}${date}${suffix}.png`;
       const downloadId = await chrome.downloads.download({url: dataUrl, filename, conflictAction: "uniquify", saveAs: false});
-      sendResponse({ok: true, downloadId, filename});
+      const completed = await waitForDownload(downloadId);
+      sendResponse({ok: true, downloadId, filename, savedPath: completed.filename});
       return;
     }
     if (message.type === "captureRaw") {
@@ -106,7 +119,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const date = new Date().toLocaleDateString("sv-SE");
       const filename = `${captureFolder ? captureFolder + "/" : ""}${date}_${String(message.index).padStart(2, "0")}_${message.part}${message.page > 1 ? `_${String(message.page).padStart(2, "0")}` : ""}.png`;
       const downloadId = await chrome.downloads.download({url: message.dataUrl, filename, conflictAction: "uniquify", saveAs: false});
-      sendResponse({ok: true, downloadId, filename});
+      const completed = await waitForDownload(downloadId);
+      sendResponse({ok: true, downloadId, filename, savedPath: completed.filename});
       return;
     }
     if (message.type === "log") {
