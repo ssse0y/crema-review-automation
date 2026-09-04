@@ -351,6 +351,19 @@
     return [product, heading, authorName, authorId];
   }
 
+  async function waitForReviewCaptureNodes(modal, timeout = 20000) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      const currentModal = modal.isConnected ? modal : modalRoot();
+      if (currentModal && productCard(currentModal) && dataDatum(currentModal, "작성자 이름") && dataDatum(currentModal, "작성자 아이디")) {
+        return currentModal;
+      }
+      await wait(250);
+    }
+    const text = (modal?.innerText || "").replace(/\s+/g, " ").trim().slice(0, 200);
+    throw new Error(`리뷰 상세 데이터가 준비되지 않았습니다. 현재 팝업 내용: ${text || "내용 없음"}`);
+  }
+
   function topReviewCaptureRect(modal) {
     const modalRect = modal.getBoundingClientRect();
     const productRect = productCard(modal)?.getBoundingClientRect();
@@ -518,8 +531,9 @@
       message.scrollIntoView({block: "center"});
       await wait(250);
       message.click();
-      const modal = await waitForModal();
+      let modal = await waitForModal();
       if (!modal) throw new Error("첫 번째 리뷰 상세 팝업이 화면에 나타나지 않았습니다.");
+      modal = await waitForReviewCaptureNodes(modal);
       const scroller = scrollBox(modal);
       await resetModalToTop(modal);
       let captureCount = await captureClonedNodes(topReviewNodes(modal), 1, "상품및아이디_테스트");
@@ -559,11 +573,12 @@
       detailCell.scrollIntoView({block: "center"});
       await wait(250);
       detailCell.click();
-      const modal = await waitForModal();
+      let modal = await waitForModal();
       if (!modal) {
         await log("리뷰 상세 내용 텍스트 클릭 후 팝업을 찾지 못함");
         continue;
       }
+      modal = await waitForReviewCaptureNodes(modal);
       const scroller = scrollBox(modal);
       await resetModalToTop(modal);
       const bodyText = reviewContent(modal);
