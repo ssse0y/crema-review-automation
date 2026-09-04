@@ -302,6 +302,46 @@
         .find(el => /상품 변경|리뷰 복사/.test(el.innerText || "")) || null;
   }
 
+  function dataDatum(modal, label) {
+    return exactText(modal, label)?.closest('[class*="AppDataList__datum"]') || null;
+  }
+
+  async function captureClonedNodes(nodes, index, part) {
+    const originals = nodes.filter(Boolean);
+    if (!originals.length) throw new Error(`${part} 캡처 요소를 찾지 못했습니다.`);
+    const stage = document.createElement("div");
+    stage.style.cssText = [
+      "position:fixed", "left:12px", "top:12px", "z-index:2147483647",
+      "width:min(680px,calc(100vw - 24px))", "box-sizing:border-box",
+      "padding:16px", "background:#fff", "color:#161613", "overflow:hidden"
+    ].join(";");
+    for (const original of originals) {
+      const clone = original.cloneNode(true);
+      clone.style.width = "100%";
+      clone.style.boxSizing = "border-box";
+      stage.appendChild(clone);
+    }
+    document.body.appendChild(stage);
+    try {
+      await wait(700);
+      const rect = stage.getBoundingClientRect();
+      if (rect.height > innerHeight - 24) throw new Error(`${part} 영역이 한 화면보다 커서 분할 캡처가 필요합니다.`);
+      await captureVisibleRect(rect, index, part);
+      return 1;
+    } finally {
+      stage.remove();
+    }
+  }
+
+  function topReviewNodes(modal) {
+    const heading = exactText(modal, "리뷰 정보")?.closest('[class*="AppHeading"]');
+    const product = productCard(modal);
+    const authorName = dataDatum(modal, "작성자 이름");
+    const authorId = dataDatum(modal, "작성자 아이디");
+    if (!product || !authorName || !authorId) throw new Error("제품 카드 또는 작성자 이름·아이디 영역을 찾지 못했습니다.");
+    return [product, heading, authorName, authorId];
+  }
+
   function topReviewCaptureRect(modal) {
     const modalRect = modal.getBoundingClientRect();
     const productRect = productCard(modal)?.getBoundingClientRect();
@@ -473,14 +513,14 @@
       if (!modal) throw new Error("첫 번째 리뷰 상세 팝업이 화면에 나타나지 않았습니다.");
       const scroller = scrollBox(modal);
       await resetModalToTop(modal);
-      let captureCount = await captureVisibleRect(topReviewCaptureRect(modal), 1, "상품및아이디_테스트");
+      let captureCount = await captureClonedNodes(topReviewNodes(modal), 1, "상품및아이디_테스트");
       const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
       const reviewCard = sectionCard(modal, "리뷰 본문");
       if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
-        captureCount += await captureRange(scroller, modal, attachmentCard, attachmentCard, 1, "첨부사진_테스트");
+        captureCount += await captureClonedNodes([attachmentCard], 1, "첨부사진_테스트");
       }
       if (reviewCard) {
-        captureCount += await captureRange(scroller, modal, reviewCard, reviewCard, 1, "리뷰본문_테스트");
+        captureCount += await captureClonedNodes([reviewCard], 1, "리뷰본문_테스트");
       } else {
         throw new Error("리뷰 본문 아래의 AppContainer 박스를 찾지 못했습니다.");
       }
@@ -532,15 +572,15 @@
         ANGER.some(word => bodyText.includes(word));
       if (qualifies) {
         const index = rows.length + 1;
-        await captureVisibleRect(topReviewCaptureRect(modal), index, "상품및아이디");
+        await captureClonedNodes(topReviewNodes(modal), index, "상품및아이디");
 
         const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
         const reviewCard = sectionCard(modal, "리뷰 본문");
         if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
-          await captureRange(scroller, modal, attachmentCard, attachmentCard, index, "첨부사진");
+          await captureClonedNodes([attachmentCard], index, "첨부사진");
         }
         if (reviewCard) {
-          await captureRange(scroller, modal, reviewCard, reviewCard, index, "리뷰본문");
+          await captureClonedNodes([reviewCard], index, "리뷰본문");
         }
         rows.push(row);
       }
