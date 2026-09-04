@@ -296,6 +296,9 @@
   }
 
   function productCard(modal) {
+    const productNameNode = modal.querySelector('[class*="ReviewReviewDialog__product-name"]');
+    const directContainer = productNameNode?.closest('[class*="AppContainer"]');
+    if (directContainer) return directContainer;
     const productAction = exactText(modal, "상품 변경") || exactText(modal, "리뷰 복사");
     return productAction?.closest('[class*="AppContainer"]') ||
       [...modal.querySelectorAll('[class*="AppContainer"]')]
@@ -303,7 +306,10 @@
   }
 
   function dataDatum(modal, label) {
-    return exactText(modal, label)?.closest('[class*="AppDataList__datum"]') || null;
+    const wanted = compact(label);
+    return [...modal.querySelectorAll('li[class*="AppDataList__datum"],[class*="AppDataList__datum"]')]
+      .find(el => compact(el.innerText).startsWith(wanted)) ||
+      exactText(modal, label)?.closest('[class*="AppDataList__datum"]') || null;
   }
 
   async function captureClonedNodes(nodes, index, part) {
@@ -338,7 +344,10 @@
     const product = productCard(modal);
     const authorName = dataDatum(modal, "작성자 이름");
     const authorId = dataDatum(modal, "작성자 아이디");
-    if (!product || !authorName || !authorId) throw new Error("제품 카드 또는 작성자 이름·아이디 영역을 찾지 못했습니다.");
+    if (!product || !authorName || !authorId) {
+      const missing = [!product && "제품 카드", !authorName && "작성자 이름", !authorId && "작성자 아이디"].filter(Boolean).join(", ");
+      throw new Error(`캡처할 영역을 찾지 못했습니다: ${missing}`);
+    }
     return [product, heading, authorName, authorId];
   }
 
