@@ -58,21 +58,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ok: true, dataUrl});
       return;
     }
-    if (message.type === "trustedClick") {
+    if (message.type === "trustedEnter") {
       if (!sender.tab?.id) throw new Error("클릭할 크리마 탭을 찾지 못했습니다.");
       const target = {tabId: sender.tab.id};
       let attached = false;
       try {
         await chrome.debugger.attach(target, "1.3");
         attached = true;
-        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
-          type: "mouseMoved", x: message.x, y: message.y
+        await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+          type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13
         });
-        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
-          type: "mousePressed", x: message.x, y: message.y, button: "left", clickCount: 1
-        });
-        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
-          type: "mouseReleased", x: message.x, y: message.y, button: "left", clickCount: 1
+        await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+          type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13
         });
         sendResponse({ok: true});
       } finally {
