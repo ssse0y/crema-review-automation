@@ -79,11 +79,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           objectId,
           functionDeclaration: "function() { this.focus({preventScroll: true}); }"
         });
-        const box = await chrome.debugger.sendCommand(target, "DOM.getBoxModel", {objectId});
-        const quad = box?.model?.border;
-        if (!quad || quad.length < 8) throw new Error("최종 지급 버튼의 화면 위치를 확인하지 못했습니다.");
-        const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4;
-        const y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4;
+        const rectResult = await chrome.debugger.sendCommand(target, "Runtime.callFunctionOn", {
+          objectId,
+          functionDeclaration: "function() { const r = this.getBoundingClientRect(); return {left:r.left, top:r.top, width:r.width, height:r.height}; }",
+          returnByValue: true
+        });
+        const rect = rectResult?.result?.value;
+        if (!rect || rect.width < 1 || rect.height < 1) throw new Error("최종 지급 버튼의 화면 위치를 확인하지 못했습니다.");
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const hitTest = await chrome.debugger.sendCommand(target, "Runtime.evaluate", {
+          expression: `(() => { const hit=document.elementFromPoint(${x},${y}); const button=document.querySelector('[data-crema-final-pay="${message.marker}"]'); return !!(hit && button && (hit===button || button.contains(hit))); })()`,
+          returnByValue: true
+        });
+        if (hitTest?.result?.value !== true) throw new Error("계산된 위치가 파란 적립금 지급 버튼과 일치하지 않아 클릭을 중단했습니다.");
         await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
           type: "mouseMoved", x, y
         });
@@ -95,7 +104,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           type: "mouseReleased", x, y, button: "left", buttons: 0, clickCount: 1
         });
         await new Promise(resolve => setTimeout(resolve, 1500));
-        sendResponse({ok: true, info: {method: "dynamic-button-position"}});
+        sendResponse({ok: true, info: {method: "verified-dynamic-button-position"}});
       } finally {
         if (attached) await chrome.debugger.detach(target).catch(() => {});
       }

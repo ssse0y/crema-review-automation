@@ -137,6 +137,10 @@
     if (!pageClick?.ok) throw new Error(`최종 적립금 지급 버튼 실행 실패: ${pageClick?.error || "알 수 없는 오류"}`);
     for (let i = 0; i < 150 && visible(dialog); i++) await wait(200);
     if (visible(dialog)) throw new Error(`최종 적립금 지급 후에도 지급 팝업이 닫히지 않았습니다. 버튼 정보: ${JSON.stringify(pageClick.info || {})}`);
+    const paymentNotice = compact(document.body.innerText);
+    if (!/(적립금지급.{0,20}(진행|처리|요청|완료)|(진행|처리)중.{0,20}적립금)/.test(paymentNotice)) {
+      throw new Error("지급 팝업은 닫혔지만 ‘적립금 지급 중’ 알림을 확인하지 못했습니다. 실제 지급 여부를 확인해주세요.");
+    }
     await log("최종 적립금 지급 버튼 1회 클릭 완료");
   }
 
