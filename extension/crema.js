@@ -74,6 +74,27 @@
     const header = [...document.querySelectorAll("thead")].find(visible);
     const headerCheckbox = header?.querySelector("input[type='checkbox'],[role='checkbox']");
     if (headerCheckbox) return headerCheckbox;
+    // 신규 리뷰 표는 실제 input 없이 AppCheckbox 계열 요소로 렌더링되기도 한다.
+    // '작성일' 머리글과 같은 줄, 그 왼쪽에 있는 체크박스만 전체 선택으로 인정한다.
+    const writtenAt = [...document.querySelectorAll("body *")]
+      .find(el => visible(el) && compact(el.innerText) === "작성일" && el.children.length <= 2);
+    if (writtenAt) {
+      const writtenRect = writtenAt.getBoundingClientRect();
+      let headerRow = writtenAt.parentElement;
+      for (let depth = 0; depth < 8 && headerRow; depth++, headerRow = headerRow.parentElement) {
+        const rowText = compact(headerRow.innerText);
+        if (!rowText.includes("고객정보") || !rowText.includes("상품") || !rowText.includes("리뷰상세내용")) continue;
+        const custom = [...headerRow.querySelectorAll(
+          "input[type='checkbox'],[role='checkbox'],label,button,[class*='Checkbox'],[class*='checkbox']"
+        )].filter(el => {
+          const rect = el.getBoundingClientRect();
+          const shown = visible(el) || [...el.children].some(visible);
+          return shown && rect.width >= 12 && rect.width <= 48 && rect.height >= 12 && rect.height <= 48 &&
+            rect.right < writtenRect.left && Math.abs((rect.top + rect.bottom) / 2 - (writtenRect.top + writtenRect.bottom) / 2) <= 35;
+        }).sort((a, b) => b.getBoundingClientRect().left - a.getBoundingClientRect().left);
+        if (custom[0]) return custom[0];
+      }
+    }
     // 크리마가 표를 div 기반으로 렌더링하는 경우 화면에서 가장 위에 있는
     // 목록용 체크박스를 전체 선택 체크박스로 사용한다.
     const candidates = [...document.querySelectorAll("input[type='checkbox'],[role='checkbox'],label")]
@@ -87,10 +108,19 @@
   }
 
   async function payAllRewards() {
-    const checkbox = masterCheckbox();
+    let checkbox = null;
+    for (let i = 0; i < 50 && !checkbox; i++) {
+      checkbox = masterCheckbox();
+      if (!checkbox) await wait(200);
+    }
     if (!checkbox) throw new Error("적립금 지급 목록의 전체 선택 체크박스를 찾지 못했습니다.");
-    const checked = checkbox.matches("input") ? checkbox.checked : checkbox.getAttribute("aria-checked") === "true";
-    if (!checked) checkbox.click();
+    const input = checkbox.matches("input[type='checkbox']") ? checkbox : checkbox.querySelector("input[type='checkbox']");
+    const checked = input ? input.checked : checkbox.getAttribute("aria-checked") === "true" || /checked|selected|active/i.test(checkbox.className || "");
+    if (!checked) {
+      const clickTarget = input || checkbox.closest("label,button,[role='checkbox']") || checkbox;
+      clickTarget.scrollIntoView({block: "center"});
+      clickTarget.click();
+    }
     await wait(700);
 
     const payButton = findExactClickable("적립금 지급");
