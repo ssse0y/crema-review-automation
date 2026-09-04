@@ -197,9 +197,10 @@
   }
 
   async function waitForModal() {
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 75; i++) {
       const modal = modalRoot();
-      if (modal) return modal;
+      const text = modal?.innerText || "";
+      if (modal && text.includes("작성자 아이디") && text.includes("리뷰 본문")) return modal;
       await wait(200);
     }
     return null;
@@ -366,7 +367,7 @@
       await wait(250);
       message.click();
       const modal = await waitForModal();
-      if (!modal) throw new Error("첫 번째 리뷰의 상세 팝업이 열리지 않았습니다.");
+      if (!modal) throw new Error("첫 번째 리뷰 상세창의 내용이 15초 안에 로딩되지 않았습니다.");
       const scroller = scrollBox(modal);
       scroller.scrollTop = 0;
       await wait(300);
