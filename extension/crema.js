@@ -124,16 +124,20 @@
       .filter(el => visible(el) && compact(el.innerText) === "적립금지급" && !el.disabled && el.getAttribute("aria-disabled") !== "true")
       .sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
     if (!finalPayButton) throw new Error("최종 지급 팝업의 파란 ‘적립금 지급’ 버튼을 찾지 못했습니다.");
-    // 좌표에 의존하지 않도록 실제 버튼에 포커스를 준 뒤 Enter를 한 번 보낸다.
+    // 확장 프로그램 격리 영역이 아닌 크리마 페이지 실행 영역에서 버튼의
+    // 실제 click 메서드를 한 번만 호출한다.
     finalPayButton.scrollIntoView({block: "center", inline: "center"});
-    finalPayButton.focus({preventScroll: true});
     await wait(200);
-    const trustedEnter = await chrome.runtime.sendMessage({
-      type: "trustedEnter"
+    const marker = `crema-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    finalPayButton.setAttribute("data-crema-final-pay", marker);
+    const pageClick = await chrome.runtime.sendMessage({
+      type: "mainWorldClick",
+      marker
     });
-    if (!trustedEnter?.ok) throw new Error(`최종 적립금 지급 버튼 실행 실패: ${trustedEnter?.error || "알 수 없는 오류"}`);
+    finalPayButton.removeAttribute("data-crema-final-pay");
+    if (!pageClick?.ok) throw new Error(`최종 적립금 지급 버튼 실행 실패: ${pageClick?.error || "알 수 없는 오류"}`);
     for (let i = 0; i < 150 && visible(dialog); i++) await wait(200);
-    if (visible(dialog)) throw new Error("최종 적립금 지급 후에도 지급 팝업이 닫히지 않았습니다. 입력값 또는 오류 메시지를 확인해주세요.");
+    if (visible(dialog)) throw new Error(`최종 적립금 지급 후에도 지급 팝업이 닫히지 않았습니다. 버튼 정보: ${JSON.stringify(pageClick.info || {})}`);
     await log("최종 적립금 지급 버튼 1회 클릭 완료");
   }
 
