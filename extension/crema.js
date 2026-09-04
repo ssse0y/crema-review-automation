@@ -9,7 +9,11 @@
     "고장", "파손", "누락", "효과 없", "냄새가", "배송이 느", "품질이"
   ];
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-  const visible = el => !!(el && el.getClientRects().length);
+  const visible = el => {
+    if (!el || !el.getClientRects().length) return false;
+    const style = getComputedStyle(el);
+    return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+  };
   const log = message => chrome.runtime.sendMessage({type: "log", message}).catch(() => {});
   const setStatus = (status, message, detail = "") => chrome.runtime.sendMessage({type: "runStatus", status, message, detail}).catch(() => {});
   const compact = text => (text || "").replace(/\s+/g, "").trim();
@@ -177,23 +181,11 @@
   }
 
   function modalRoot() {
-    const appModal = [...document.querySelectorAll("div.AppModal")].find(visible);
-    if (appModal) return appModal;
+    const appModals = [...document.querySelectorAll(".the-dialogs > .AppModal, #the-dialogs > .AppModal, div.AppModal")].filter(visible);
+    if (appModals.length) return appModals[appModals.length - 1];
     const title = [...document.querySelectorAll("body *")]
       .find(el => visible(el) && compact(el.innerText).startsWith("리뷰상세") && el.children.length <= 3);
-    if (!title) {
-      return [...document.querySelectorAll('[class*="AppModal__wrapper"],[class*="AppModalLayout"]')]
-        .filter(visible)
-        .sort((a, b) => b.getBoundingClientRect().width * b.getBoundingClientRect().height - a.getBoundingClientRect().width * a.getBoundingClientRect().height)[0] || null;
-    }
-    return title.closest("[role='dialog'],.modal,.ant-modal,.MuiDialog-root") || (() => {
-      let el = title;
-      for (let i = 0; i < 8 && el.parentElement; i++, el = el.parentElement) {
-        const r = el.getBoundingClientRect();
-        if (r.width > 500 && r.height > 400 && r.width < innerWidth * .9) return el;
-      }
-      return title.parentElement;
-    })();
+    return title?.closest(".AppModal,[role='dialog']") || null;
   }
 
   function scrollBox(modal) {
@@ -351,17 +343,30 @@
     return [product, heading, authorName, authorId];
   }
 
-  async function waitForReviewCaptureNodes(modal, timeout = 20000) {
-    const deadline = Date.now() + timeout;
-    while (Date.now() < deadline) {
-      const currentModal = modal.isConnected ? modal : modalRoot();
-      if (currentModal && productCard(currentModal) && dataDatum(currentModal, "작성자 이름") && dataDatum(currentModal, "작성자 아이디")) {
-        return currentModal;
-      }
-      await wait(250);
-    }
-    const text = (modal?.innerText || "").replace(/\s+/g, " ").trim().slice(0, 200);
-    throw new Error(`리뷰 상세 데이터가 준비되지 않았습니다. 현재 팝업 내용: ${text || "내용 없음"}`);
+  async function waitForReviewCaptureNodes(modal, timeout = 10000) {
+    return new Promise((resolve, reject) => {
+      let observer;
+      let timer;
+      const check = () => {
+        const currentModal = modal?.isConnected && visible(modal) ? modal : modalRoot();
+        if (currentModal && productCard(currentModal) && dataDatum(currentModal, "작성자 이름") && dataDatum(currentModal, "작성자 아이디")) {
+          observer?.disconnect();
+          clearTimeout(timer);
+          resolve(currentModal);
+          return true;
+        }
+        return false;
+      };
+      if (check()) return;
+      observer = new MutationObserver(check);
+      observer.observe(document.body, {childList: true, subtree: true, characterData: true});
+      timer = setTimeout(() => {
+        observer.disconnect();
+        const currentModal = modalRoot();
+        const text = (currentModal?.innerText || "").replace(/\s+/g, " ").trim().slice(0, 200);
+        reject(new Error(`리뷰 상세 팝업에 제품·작성자 정보가 나타나지 않았습니다. 현재 팝업 내용: ${text || "내용 없음"}`));
+      }, timeout);
+    });
   }
 
   function topReviewCaptureRect(modal) {
