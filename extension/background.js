@@ -63,8 +63,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const target = {tabId: sender.tab.id};
       let attached = false;
       try {
+        await chrome.windows.update(sender.tab.windowId, {focused: true});
+        await chrome.tabs.update(sender.tab.id, {active: true});
         await chrome.debugger.attach(target, "1.3");
         attached = true;
+        await chrome.debugger.sendCommand(target, "Input.setIgnoreInputEvents", {ignore: false});
         const evaluated = await chrome.debugger.sendCommand(target, "Runtime.evaluate", {
           expression: `document.querySelector('[data-crema-final-pay="${message.marker}"]')`,
           returnByValue: false
@@ -72,6 +75,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const objectId = evaluated?.result?.objectId;
         if (!objectId) throw new Error("Chrome 페이지 영역에서 최종 지급 버튼을 찾지 못했습니다.");
         await chrome.debugger.sendCommand(target, "DOM.scrollIntoViewIfNeeded", {objectId});
+        await chrome.debugger.sendCommand(target, "Runtime.callFunctionOn", {
+          objectId,
+          functionDeclaration: "function() { this.focus({preventScroll: true}); }"
+        });
         const box = await chrome.debugger.sendCommand(target, "DOM.getBoxModel", {objectId});
         const quad = box?.model?.border;
         if (!quad || quad.length < 8) throw new Error("최종 지급 버튼의 화면 위치를 확인하지 못했습니다.");
@@ -81,11 +88,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           type: "mouseMoved", x, y
         });
         await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
-          type: "mousePressed", x, y, button: "left", clickCount: 1
+          type: "mousePressed", x, y, button: "left", buttons: 1, clickCount: 1
         });
+        await new Promise(resolve => setTimeout(resolve, 120));
         await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
-          type: "mouseReleased", x, y, button: "left", clickCount: 1
+          type: "mouseReleased", x, y, button: "left", buttons: 0, clickCount: 1
         });
+        await new Promise(resolve => setTimeout(resolve, 1500));
         sendResponse({ok: true, info: {method: "dynamic-button-position"}});
       } finally {
         if (attached) await chrome.debugger.detach(target).catch(() => {});
