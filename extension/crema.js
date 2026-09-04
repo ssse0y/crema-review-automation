@@ -179,7 +179,11 @@
   function modalRoot() {
     const title = [...document.querySelectorAll("body *")]
       .find(el => visible(el) && compact(el.innerText).startsWith("리뷰상세") && el.children.length <= 3);
-    if (!title) return null;
+    if (!title) {
+      return [...document.querySelectorAll('[class*="AppModal__wrapper"],[class*="AppModalLayout"]')]
+        .filter(visible)
+        .sort((a, b) => b.getBoundingClientRect().width * b.getBoundingClientRect().height - a.getBoundingClientRect().width * a.getBoundingClientRect().height)[0] || null;
+    }
     return title.closest("[role='dialog'],.modal,.ant-modal,.MuiDialog-root") || (() => {
       let el = title;
       for (let i = 0; i < 8 && el.parentElement; i++, el = el.parentElement) {
@@ -197,10 +201,12 @@
   }
 
   async function waitForModal() {
-    for (let i = 0; i < 75; i++) {
+    for (let i = 0; i < 30; i++) {
       const modal = modalRoot();
-      const text = modal?.innerText || "";
-      if (modal && text.includes("작성자 아이디") && text.includes("리뷰 본문")) return modal;
+      if (modal) {
+        await wait(1200);
+        return modal;
+      }
       await wait(200);
     }
     return null;
@@ -370,7 +376,7 @@
       await wait(250);
       message.click();
       const modal = await waitForModal();
-      if (!modal) throw new Error("첫 번째 리뷰 상세창의 내용이 15초 안에 로딩되지 않았습니다.");
+      if (!modal) throw new Error("첫 번째 리뷰 상세 팝업이 화면에 나타나지 않았습니다.");
       const scroller = scrollBox(modal);
       scroller.scrollTop = 0;
       await wait(300);
@@ -389,6 +395,9 @@
       if (reviewHeading) {
         const reviewCard = reviewHeading.nextElementSibling || reviewHeading.parentElement?.nextElementSibling || reviewHeading;
         captureCount += await captureRange(scroller, modal, reviewHeading, reviewCard, 1, "리뷰본문_테스트");
+      } else {
+        const currentRect = modal.getBoundingClientRect();
+        captureCount += await captureVisibleRect(currentRect, 1, "리뷰상세전체_테스트");
       }
       await closeModal(modal);
       if (captureCount < 2) throw new Error(`테스트 캡처가 ${captureCount}개만 저장되어 예상한 상품·아이디 및 리뷰 본문 캡처를 완료하지 못했습니다.`);
