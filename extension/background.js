@@ -58,26 +58,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ok: true, dataUrl});
       return;
     }
-    if (message.type === "mainWorldClick") {
+    if (message.type === "trustedButtonEnter") {
       if (!sender.tab?.id) throw new Error("클릭할 크리마 탭을 찾지 못했습니다.");
-      const results = await chrome.scripting.executeScript({
-        target: {tabId: sender.tab.id, frameIds: [sender.frameId]},
-        world: "MAIN",
-        func: marker => {
-          const button = document.querySelector(`[data-crema-final-pay="${marker}"]`);
-          if (!button) return {ok: false, error: "페이지 실행 영역에서 최종 지급 버튼을 찾지 못했습니다."};
-          const info = {
-            tag: button.tagName,
-            type: button.getAttribute("type") || "",
-            disabled: Boolean(button.disabled),
-            hasForm: Boolean(button.form || button.closest("form"))
-          };
-          button.click();
-          return {ok: true, info};
-        },
-        args: [message.marker]
-      });
-      sendResponse(results[0]?.result || {ok: false, error: "페이지 클릭 결과를 받지 못했습니다."});
+      const target = {tabId: sender.tab.id};
+      let attached = false;
+      try {
+        await chrome.debugger.attach(target, "1.3");
+        attached = true;
+        const results = await chrome.scripting.executeScript({
+          target: {tabId: sender.tab.id, frameIds: [sender.frameId]},
+          world: "MAIN",
+          func: marker => {
+            const button = document.querySelector(`[data-crema-final-pay="${marker}"]`);
+            if (!button) return {ok: false, error: "페이지 실행 영역에서 최종 지급 버튼을 찾지 못했습니다."};
+            button.focus({preventScroll: true});
+            return {ok: document.activeElement === button, tag: button.tagName, type: button.type || ""};
+          },
+          args: [message.marker]
+        });
+        const focus = results[0]?.result;
+        if (!focus?.ok) throw new Error(focus?.error || "최종 지급 버튼에 포커스를 지정하지 못했습니다.");
+        await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+          type: "rawKeyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13
+        });
+        await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+          type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13
+        });
+        sendResponse({ok: true, info: focus});
+      } finally {
+        if (attached) await chrome.debugger.detach(target).catch(() => {});
+      }
       return;
     }
     if (message.type === "saveCapture") {
