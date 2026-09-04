@@ -86,14 +86,14 @@ chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIn
     await chrome.notifications.clear(notificationId);
     await chrome.notifications.create(`crema-download-${Date.now()}`, {
       type: "basic",
-      iconUrl: "icon.svg",
+      iconUrl: "icon.png",
       title: "부정리뷰 캡처 다운로드",
       message: count ? `${count}개의 캡처본 다운로드를 시작했습니다.` : "다운로드할 캡처본이 없습니다."
     });
   } catch (error) {
     await chrome.notifications.create(`crema-download-error-${Date.now()}`, {
       type: "basic",
-      iconUrl: "icon.svg",
+      iconUrl: "icon.png",
       title: "캡처본 다운로드 오류",
       message: String(error)
     });
@@ -161,7 +161,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const canDownload = stagedCaptures.length > 0;
         await chrome.notifications.create(notificationId, {
           type: "basic",
-          iconUrl: "icon.svg",
+          iconUrl: "icon.png",
           title: message.status === "success" ? "크리마 작업 완료" : "크리마 작업 오류",
           message: `${message.message || (message.status === "success" ? "작업이 완료되었습니다." : "작업 중 오류가 발생했습니다.")}${canDownload ? "\n아래 버튼을 눌러 캡처본을 내려받으세요." : ""}`,
           buttons: canDownload ? [{title: "캡처본 다운받기"}] : [],

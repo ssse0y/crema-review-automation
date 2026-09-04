@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.log
 *.png
+!extension/icon.png
 *.json
 !config.example.json
 !extension/manifest.json

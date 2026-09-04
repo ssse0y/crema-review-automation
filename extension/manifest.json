@@ -12,6 +12,7 @@
     "https://script.googleusercontent.com/*"
   ],
   "background": {"service_worker": "background.js"},
+  "icons": {"128": "icon.png"},
   "content_scripts": [
     {
       "matches": ["https://www.cre.ma/*", "https://*.cre.ma/*"],
@@ -21,6 +22,7 @@
     }
   ],
   "action": {
+    "default_icon": "icon.png",
     "default_title": "크리마 적립금 지급",
     "default_popup": "popup.html"
   }
