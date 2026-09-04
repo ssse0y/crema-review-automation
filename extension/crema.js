@@ -177,6 +177,8 @@
   }
 
   function modalRoot() {
+    const appModal = [...document.querySelectorAll("div.AppModal")].find(visible);
+    if (appModal) return appModal;
     const title = [...document.querySelectorAll("body *")]
       .find(el => visible(el) && compact(el.innerText).startsWith("리뷰상세") && el.children.length <= 3);
     if (!title) {
@@ -195,6 +197,8 @@
   }
 
   function scrollBox(modal) {
+    const modalBody = modal.querySelector(".AppModalLayout__body");
+    if (modalBody && visible(modalBody)) return modalBody;
     return [...modal.querySelectorAll("*")]
       .filter(el => visible(el) && el.scrollHeight > el.clientHeight + 30)
       .sort((a, b) => b.clientHeight - a.clientHeight)[0] || modal;
@@ -223,11 +227,26 @@
   }
 
   function sectionText(modal, heading) {
+    const card = sectionCard(modal, heading);
+    if (card) return (card.innerText || card.textContent || "").trim();
     const node = exactText(modal, heading);
     if (!node) return "";
     let next = node.nextElementSibling;
     if (!next && node.parentElement) next = node.parentElement.nextElementSibling;
     return (next?.innerText || next?.textContent || "").trim();
+  }
+
+  function sectionCard(modal, heading) {
+    const node = exactText(modal, heading);
+    if (!node) return null;
+    const headingBlock = node.closest('[class*="AppHeading"]') || node.parentElement || node;
+    let candidate = headingBlock.nextElementSibling;
+    for (let i = 0; i < 4 && candidate; i++, candidate = candidate.nextElementSibling) {
+      if (candidate.matches?.('[class*="AppContainer"]')) return candidate;
+      const nested = candidate.querySelector?.('[class*="AppContainer"]');
+      if (nested) return nested;
+    }
+    return node.nextElementSibling || node.parentElement?.nextElementSibling || null;
   }
 
   function productName(modal) {
@@ -386,15 +405,13 @@
       const idRect = idBlock?.getBoundingClientRect();
       const topBottom = idRect ? idRect.bottom + 10 : Math.min(modalRect.bottom, modalRect.top + innerHeight * .55);
       let captureCount = await captureVisibleRect({left: modalRect.left, top: modalRect.top, width: modalRect.width, height: topBottom - modalRect.top}, 1, "상품및아이디_테스트");
-      const attachmentHeading = exactText(modal, "첨부 포토/동영상");
-      const reviewHeading = exactText(modal, "리뷰 본문");
-      if (attachmentHeading && reviewHeading) {
-        const attachmentEnd = reviewHeading.previousElementSibling || attachmentHeading.parentElement?.nextElementSibling || attachmentHeading;
-        captureCount += await captureRange(scroller, modal, attachmentHeading, attachmentEnd, 1, "첨부사진_테스트");
+      const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
+      const reviewCard = sectionCard(modal, "리뷰 본문");
+      if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
+        captureCount += await captureRange(scroller, modal, attachmentCard, attachmentCard, 1, "첨부사진_테스트");
       }
-      if (reviewHeading) {
-        const reviewCard = reviewHeading.nextElementSibling || reviewHeading.parentElement?.nextElementSibling || reviewHeading;
-        captureCount += await captureRange(scroller, modal, reviewHeading, reviewCard, 1, "리뷰본문_테스트");
+      if (reviewCard) {
+        captureCount += await captureRange(scroller, modal, reviewCard, reviewCard, 1, "리뷰본문_테스트");
       } else {
         const currentRect = modal.getBoundingClientRect();
         captureCount += await captureVisibleRect(currentRect, 1, "리뷰상세전체_테스트");
@@ -455,15 +472,13 @@
         const topBottom = idRect ? idRect.bottom + 10 : Math.min(modalRect.bottom, modalRect.top + innerHeight * .55);
         await captureVisibleRect({left: modalRect.left, top: modalRect.top, width: modalRect.width, height: topBottom - modalRect.top}, index, "상품및아이디");
 
-        const attachmentHeading = exactText(modal, "첨부 포토/동영상");
-        const reviewHeading = exactText(modal, "리뷰 본문");
-        if (attachmentHeading && reviewHeading) {
-          const attachmentEnd = reviewHeading.previousElementSibling || attachmentHeading.parentElement?.nextElementSibling || attachmentHeading;
-          await captureRange(scroller, modal, attachmentHeading, attachmentEnd, index, "첨부사진");
+        const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
+        const reviewCard = sectionCard(modal, "리뷰 본문");
+        if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
+          await captureRange(scroller, modal, attachmentCard, attachmentCard, index, "첨부사진");
         }
-        if (reviewHeading) {
-          const reviewCard = reviewHeading.nextElementSibling || reviewHeading.parentElement?.nextElementSibling || reviewHeading;
-          await captureRange(scroller, modal, reviewHeading, reviewCard, index, "리뷰본문");
+        if (reviewCard) {
+          await captureRange(scroller, modal, reviewCard, reviewCard, index, "리뷰본문");
         }
         rows.push(row);
       }
