@@ -354,6 +354,43 @@
       await chrome.storage.local.set({[RUN_KEY]: false});
       return;
     }
+    if (phase === "capture_test") {
+      currentStage = "첫 번째 리뷰 캡처 테스트";
+      let message = null;
+      for (let i = 0; i < 30 && !message; i++) {
+        message = [...document.querySelectorAll('span[class*="ReviewReviewsReviewCell__message"]')].find(visible) || null;
+        if (!message) await wait(200);
+      }
+      if (!message) throw new Error("캡처 테스트에 사용할 리뷰 내용을 찾지 못했습니다.");
+      message.scrollIntoView({block: "center"});
+      await wait(250);
+      message.click();
+      const modal = await waitForModal();
+      if (!modal) throw new Error("첫 번째 리뷰의 상세 팝업이 열리지 않았습니다.");
+      const scroller = scrollBox(modal);
+      scroller.scrollTop = 0;
+      await wait(300);
+      const idLabel = exactText(modal, "작성자 아이디");
+      const idBlock = idLabel?.parentElement || idLabel;
+      const modalRect = modal.getBoundingClientRect();
+      const idRect = idBlock?.getBoundingClientRect();
+      const topBottom = idRect ? idRect.bottom + 10 : Math.min(modalRect.bottom, modalRect.top + innerHeight * .55);
+      await captureVisibleRect({left: modalRect.left, top: modalRect.top, width: modalRect.width, height: topBottom - modalRect.top}, 1, "상품및아이디_테스트");
+      const attachmentHeading = exactText(modal, "첨부 포토/동영상");
+      const reviewHeading = exactText(modal, "리뷰 본문");
+      if (attachmentHeading && reviewHeading) {
+        const attachmentEnd = reviewHeading.previousElementSibling || attachmentHeading.parentElement?.nextElementSibling || attachmentHeading;
+        await captureRange(scroller, modal, attachmentHeading, attachmentEnd, 1, "첨부사진_테스트");
+      }
+      if (reviewHeading) {
+        const reviewCard = reviewHeading.nextElementSibling || reviewHeading.parentElement?.nextElementSibling || reviewHeading;
+        await captureRange(scroller, modal, reviewHeading, reviewCard, 1, "리뷰본문_테스트");
+      }
+      await closeModal(modal);
+      await setStatus("success", "첫 번째 리뷰 캡처 테스트가 완료되었습니다.", "스프레드시트 기록과 적립금 지급은 실행하지 않았습니다.");
+      await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
+      return;
+    }
     if (phase === "payment") {
       const payment = await payoutCurrentTab();
       await setStatus("success", payment.paid ? "적립금 지급이 완료되었습니다." : "지급이 필요한 리뷰가 없습니다.", "");

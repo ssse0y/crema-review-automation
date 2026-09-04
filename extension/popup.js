@@ -1,4 +1,5 @@
 const button = document.getElementById("run");
+const captureTest = document.getElementById("captureTest");
 const status = document.getElementById("status");
 const folder = document.getElementById("folder");
 const editArea = document.getElementById("editArea");
@@ -136,6 +137,18 @@ editSheet.addEventListener("click", () => {
 savedSheetUrl.addEventListener("click", async event => {
   event.preventDefault();
   if (savedSheetUrl.href) await chrome.tabs.create({url: savedSheetUrl.href});
+});
+
+captureTest.addEventListener("click", async () => {
+  await chrome.storage.local.set({captureFolder: folder.value.trim()});
+  captureTest.disabled = true;
+  status.textContent = "첫 번째 리뷰의 캡처 테스트를 시작합니다…";
+  const result = await chrome.runtime.sendMessage({type: "runCaptureTest"});
+  if (!result?.ok) {
+    renderRunStatus({lastRunStatus: "error", lastRunMessage: "캡처 테스트를 시작하지 못했습니다.", lastRunDetail: result?.error || "알 수 없는 오류"});
+    return;
+  }
+  setTimeout(() => window.close(), 700);
 });
 
 button.addEventListener("click", async () => {
