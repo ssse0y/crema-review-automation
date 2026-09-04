@@ -285,6 +285,10 @@
   }
 
   function reviewDetailCell(row) {
+    const exactMessage = row.matches?.('span[class*="ReviewReviewsReviewCell__message"]')
+      ? row
+      : row.querySelector?.('span[class*="ReviewReviewsReviewCell__message"]');
+    if (exactMessage && visible(exactMessage)) return exactMessage;
     const table = row.closest("table");
     const headers = table ? [...table.querySelectorAll("thead th")] : [];
     const index = headers.findIndex(th => compact(th.innerText).includes("리뷰상세내용"));
@@ -362,12 +366,14 @@
     const tableRows = reviewTable ? [...reviewTable.querySelectorAll("tbody tr")].filter(visible) : [];
     const statuses = [...document.querySelectorAll("body *")].filter(el => visible(el) && (el.innerText || "").trim() === "부정 리뷰");
     const listRows = tableRows.length ? tableRows : [...new Set(statuses.map(status => status.closest("tr") || containerFor(status)))];
+    const reviewMessages = [...document.querySelectorAll('span[class*="ReviewReviewsReviewCell__message"]')].filter(visible);
+    const reviewTargets = reviewMessages.length ? reviewMessages : listRows;
     const rows = [];
-    for (const listRow of listRows) {
-      const detailCell = reviewDetailCell(listRow);
+    for (const reviewTarget of reviewTargets) {
+      const detailCell = reviewDetailCell(reviewTarget);
       detailCell.scrollIntoView({block: "center"});
       await wait(250);
-      (detailCell.querySelector("a,button,[role=button]") || detailCell).click();
+      detailCell.click();
       const modal = await waitForModal();
       if (!modal) {
         await log("리뷰 상세 내용 텍스트 클릭 후 팝업을 찾지 못함");
