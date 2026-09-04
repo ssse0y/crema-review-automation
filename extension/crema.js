@@ -277,11 +277,31 @@
   function authorIdBottom(modal) {
     const label = exactText(modal, "작성자 아이디");
     if (!label) return null;
-    const heading = label.closest('[class*="AppHeading"]') || label;
-    const value = heading.nextElementSibling?.matches?.('[class*="AppContainer"]')
-      ? heading.nextElementSibling
-      : label.nextElementSibling || label.parentElement?.nextElementSibling;
+    const labelRect = label.getBoundingClientRect();
+    const id = labelValue(modal, "작성자 아이디");
+    const value = [...modal.querySelectorAll("*")]
+      .filter(el => compact(el.innerText) === compact(id) && el.children.length <= 1)
+      .filter(el => {
+        const rect = el.getBoundingClientRect();
+        return rect.top >= labelRect.bottom - 2 && rect.top < labelRect.bottom + 80;
+      })
+      .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
     return (value || label).getBoundingClientRect().bottom + 10;
+  }
+
+  function productCard(modal) {
+    const productAction = exactText(modal, "상품 변경") || exactText(modal, "리뷰 복사");
+    return productAction?.closest('[class*="AppContainer"]') ||
+      [...modal.querySelectorAll('[class*="AppContainer"]')]
+        .find(el => /상품 변경|리뷰 복사/.test(el.innerText || "")) || null;
+  }
+
+  function topReviewCaptureRect(modal) {
+    const modalRect = modal.getBoundingClientRect();
+    const productRect = productCard(modal)?.getBoundingClientRect();
+    const top = productRect ? Math.max(modalRect.top, productRect.top - 8) : modalRect.top;
+    const bottom = authorIdBottom(modal) || Math.min(modalRect.bottom, top + innerHeight * .55);
+    return {left: modalRect.left, top, width: modalRect.width, height: Math.max(1, bottom - top)};
   }
 
   function productName(modal) {
@@ -432,9 +452,7 @@
       if (!modal) throw new Error("첫 번째 리뷰 상세 팝업이 화면에 나타나지 않았습니다.");
       const scroller = scrollBox(modal);
       await resetModalToTop(modal);
-      const modalRect = modal.getBoundingClientRect();
-      const topBottom = authorIdBottom(modal) || Math.min(modalRect.bottom, modalRect.top + innerHeight * .55);
-      let captureCount = await captureVisibleRect({left: modalRect.left, top: modalRect.top, width: modalRect.width, height: topBottom - modalRect.top}, 1, "상품및아이디_테스트");
+      let captureCount = await captureVisibleRect(topReviewCaptureRect(modal), 1, "상품및아이디_테스트");
       const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
       const reviewCard = sectionCard(modal, "리뷰 본문");
       if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
@@ -493,9 +511,7 @@
         ANGER.some(word => bodyText.includes(word));
       if (qualifies) {
         const index = rows.length + 1;
-        const modalRect = modal.getBoundingClientRect();
-        const topBottom = authorIdBottom(modal) || Math.min(modalRect.bottom, modalRect.top + innerHeight * .55);
-        await captureVisibleRect({left: modalRect.left, top: modalRect.top, width: modalRect.width, height: topBottom - modalRect.top}, index, "상품및아이디");
+        await captureVisibleRect(topReviewCaptureRect(modal), index, "상품및아이디");
 
         const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
         const reviewCard = sectionCard(modal, "리뷰 본문");
