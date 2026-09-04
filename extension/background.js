@@ -58,6 +58,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ok: true, dataUrl});
       return;
     }
+    if (message.type === "trustedClick") {
+      if (!sender.tab?.id) throw new Error("클릭할 크리마 탭을 찾지 못했습니다.");
+      const target = {tabId: sender.tab.id};
+      let attached = false;
+      try {
+        await chrome.debugger.attach(target, "1.3");
+        attached = true;
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mouseMoved", x: message.x, y: message.y
+        });
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mousePressed", x: message.x, y: message.y, button: "left", clickCount: 1
+        });
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mouseReleased", x: message.x, y: message.y, button: "left", clickCount: 1
+        });
+        sendResponse({ok: true});
+      } finally {
+        if (attached) await chrome.debugger.detach(target).catch(() => {});
+      }
+      return;
+    }
     if (message.type === "saveCapture") {
       const {captureFolder} = await settings();
       const date = new Date().toLocaleDateString("sv-SE");

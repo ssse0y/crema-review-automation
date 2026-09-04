@@ -124,9 +124,17 @@
       .filter(el => visible(el) && compact(el.innerText) === "적립금지급" && !el.disabled && el.getAttribute("aria-disabled") !== "true")
       .sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
     if (!finalPayButton) throw new Error("최종 지급 팝업의 파란 ‘적립금 지급’ 버튼을 찾지 못했습니다.");
-    // 팝업 내부에서 찾은 실제 파란 버튼 자체를 한 번만 누른다.
-    // 자식 span에 합성 마우스 이벤트를 보내면 크리마가 무시하는 경우가 있다.
-    finalPayButton.click();
+    // 크리마가 합성 DOM 클릭을 무시하므로 Chrome 입력 계층에서 실제 마우스
+    // 클릭과 같은 이벤트를 버튼 중앙에 한 번만 보낸다.
+    finalPayButton.scrollIntoView({block: "center", inline: "center"});
+    await wait(200);
+    const buttonRect = finalPayButton.getBoundingClientRect();
+    const trustedClick = await chrome.runtime.sendMessage({
+      type: "trustedClick",
+      x: buttonRect.left + buttonRect.width / 2,
+      y: buttonRect.top + buttonRect.height / 2
+    });
+    if (!trustedClick?.ok) throw new Error(`최종 적립금 지급 버튼 클릭 실패: ${trustedClick?.error || "알 수 없는 오류"}`);
     for (let i = 0; i < 150 && visible(dialog); i++) await wait(200);
     if (visible(dialog)) throw new Error("최종 적립금 지급 후에도 지급 팝업이 닫히지 않았습니다. 입력값 또는 오류 메시지를 확인해주세요.");
     await log("최종 적립금 지급 버튼 1회 클릭 완료");
