@@ -111,7 +111,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastRunStatus: "running",
         lastRunMessage: "부정 리뷰를 확인하고 있습니다.",
         lastRunDetail: "",
-        lastRunAt: new Date().toISOString()
+        lastRunAt: new Date().toISOString(),
+        paymentCompletionNotified: false
       });
       const stamp = Date.now();
       await chrome.tabs.create({url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
@@ -126,7 +127,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastRunStatus: "running",
         lastRunMessage: "첫 번째 리뷰의 캡처·시트 기록과 다운로드 알림을 테스트하고 있습니다.",
         lastRunDetail: "",
-        lastRunAt: new Date().toISOString()
+        lastRunAt: new Date().toISOString(),
+        paymentCompletionNotified: false
       });
       const stamp = Date.now();
       await chrome.tabs.create({url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
@@ -141,7 +143,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastRunStatus: "running",
         lastRunMessage: "첫 번째 리뷰를 스프레드시트에 기록하고 있습니다.",
         lastRunDetail: "",
-        lastRunAt: new Date().toISOString()
+        lastRunAt: new Date().toISOString(),
+        paymentCompletionNotified: false
       });
       const stamp = Date.now();
       await chrome.tabs.create({url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
@@ -156,6 +159,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastRunAt: new Date().toISOString()
       });
       if (message.status === "success" || message.status === "error") {
+        const notificationState = await chrome.storage.local.get({paymentCompletionNotified: false});
+        if (message.status === "success" && notificationState.paymentCompletionNotified) {
+          sendResponse({ok: true, notificationAlreadySent: true});
+          return;
+        }
         const notificationId = `crema-${Date.now()}`;
         const stagedCaptures = await captureStore("all");
         const canDownload = stagedCaptures.length > 0;
@@ -205,7 +213,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         },
         args: [message.marker]
       });
-      sendResponse(results[0]?.result || {ok: false, error: "최종 지급 버튼 실행 결과를 받지 못했습니다."});
+      const clickResult = results[0]?.result || {ok: false, error: "최종 지급 버튼 실행 결과를 받지 못했습니다."};
+      if (clickResult.ok) {
+        const notificationId = `crema-payment-${Date.now()}`;
+        const stagedCaptures = await captureStore("all");
+        const canDownload = stagedCaptures.length > 0;
+        await chrome.storage.local.set({
+          paymentCompletionNotified: true,
+          lastRunStatus: "success",
+          lastRunMessage: "적립금 지급 버튼 클릭이 완료되었습니다.",
+          lastRunDetail: "크리마에서 적립금 지급 처리를 시작했습니다.",
+          lastRunAt: new Date().toISOString()
+        });
+        await chrome.notifications.create(notificationId, {
+          type: "basic",
+          iconUrl: "icon.png",
+          title: "크리마 적립금 지급 완료",
+          message: `적립금 지급 처리를 시작했습니다.${canDownload ? "\n아래 버튼을 눌러 캡처본을 내려받으세요." : ""}`,
+          buttons: canDownload ? [{title: "캡처본 다운받기"}] : [],
+          priority: 1
+        });
+      }
+      sendResponse(clickResult);
       return;
     }
     if (message.type === "saveCapture") {
