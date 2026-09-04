@@ -407,7 +407,7 @@
       let captureCount = await captureVisibleRect({left: modalRect.left, top: modalRect.top, width: modalRect.width, height: topBottom - modalRect.top}, 1, "상품및아이디_테스트");
       const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
       const reviewCard = sectionCard(modal, "리뷰 본문");
-      if (attachmentCard) {
+      if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
         captureCount += await captureRange(scroller, modal, attachmentCard, attachmentCard, 1, "첨부사진_테스트");
       }
       if (reviewCard) {
@@ -417,7 +417,7 @@
         captureCount += await captureVisibleRect(currentRect, 1, "리뷰상세전체_테스트");
       }
       await closeModal(modal);
-      if (captureCount < 3) throw new Error(`테스트 캡처가 ${captureCount}개만 저장되어 상품·아이디, 첨부 포토/동영상, 리뷰 본문 캡처를 모두 완료하지 못했습니다.`);
+      if (captureCount < 2) throw new Error(`테스트 캡처가 ${captureCount}개만 저장되어 상품·아이디 및 리뷰 본문 캡처를 완료하지 못했습니다.`);
       await setStatus("success", `첫 번째 리뷰 캡처 테스트가 완료되었습니다. PNG ${captureCount}개를 저장했습니다.`, "스프레드시트 기록과 적립금 지급은 실행하지 않았습니다.");
       await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
       return;
@@ -474,7 +474,7 @@
 
         const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
         const reviewCard = sectionCard(modal, "리뷰 본문");
-        if (attachmentCard) {
+        if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
           await captureRange(scroller, modal, attachmentCard, attachmentCard, index, "첨부사진");
         }
         if (reviewCard) {
