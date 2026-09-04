@@ -434,7 +434,7 @@
       const dataUrl = await cropScreenshot(rect);
       const saved = await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page});
       if (!saved?.ok) throw new Error(`${part} 캡처 저장 실패: ${saved?.error || "알 수 없는 오류"}`);
-      await log(`${part} 캡처 저장 완료: ${saved.savedPath || saved.filename}`);
+      await log(`${part} 캡처 임시 보관 완료: ${saved.savedPath || saved.filename}`);
       offset += Math.max(100, available - 12);
       page++;
     }
@@ -451,7 +451,7 @@
     const dataUrl = await cropScreenshot(bounded);
     const saved = await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page: 1, reviewId});
     if (!saved?.ok) throw new Error(`${part} 캡처 저장 실패: ${saved?.error || "알 수 없는 오류"}`);
-    await log(`${part} 캡처 저장 완료: ${saved.savedPath || saved.filename}`);
+    await log(`${part} 캡처 임시 보관 완료: ${saved.savedPath || saved.filename}`);
     return 1;
   }
 

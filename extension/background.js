@@ -39,31 +39,71 @@ function parseSpreadsheet(url) {
   return {spreadsheetId: id, sheetId: gid === undefined ? null : Number(gid)};
 }
 
-async function resetRunCaptureLink() {
-  await chrome.storage.local.remove("lastCaptureDownloadId");
+function captureDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("crema-captures", 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("captures", {keyPath: "id", autoIncrement: true});
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
 }
 
-chrome.notifications.onClicked.addListener(async notificationId => {
-  if (!notificationId.startsWith("crema-")) return;
-  const data = await chrome.storage.local.get({notificationDownloadLinks: {}});
-  const downloadId = data.notificationDownloadLinks[notificationId];
-  if (Number.isInteger(downloadId)) await chrome.downloads.show(downloadId);
-  await chrome.notifications.clear(notificationId);
-});
+async function captureStore(mode, value) {
+  const db = await captureDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("captures", "readwrite");
+    const store = transaction.objectStore("captures");
+    const request = mode === "add" ? store.add(value) : mode === "all" ? store.getAll() : store.clear();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => db.close();
+  });
+}
 
-chrome.notifications.onClosed.addListener(async notificationId => {
-  if (!notificationId.startsWith("crema-")) return;
-  const data = await chrome.storage.local.get({notificationDownloadLinks: {}});
-  if (!(notificationId in data.notificationDownloadLinks)) return;
-  const links = {...data.notificationDownloadLinks};
-  delete links[notificationId];
-  await chrome.storage.local.set({notificationDownloadLinks: links});
+async function resetRunCaptures() {
+  await captureStore("clear");
+}
+
+async function downloadStagedCaptures() {
+  const captures = await captureStore("all");
+  if (!captures.length) return 0;
+  for (const capture of captures) {
+    await chrome.downloads.download({
+      url: capture.dataUrl,
+      filename: capture.filename,
+      conflictAction: "uniquify",
+      saveAs: false
+    });
+  }
+  await captureStore("clear");
+  return captures.length;
+}
+
+chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIndex) => {
+  if (!notificationId.startsWith("crema-") || buttonIndex !== 0) return;
+  try {
+    const count = await downloadStagedCaptures();
+    await chrome.notifications.clear(notificationId);
+    await chrome.notifications.create(`crema-download-${Date.now()}`, {
+      type: "basic",
+      iconUrl: "icon.svg",
+      title: "부정리뷰 캡처 다운로드",
+      message: count ? `${count}개의 캡처본 다운로드를 시작했습니다.` : "다운로드할 캡처본이 없습니다."
+    });
+  } catch (error) {
+    await chrome.notifications.create(`crema-download-error-${Date.now()}`, {
+      type: "basic",
+      iconUrl: "icon.svg",
+      title: "캡처본 다운로드 오류",
+      message: String(error)
+    });
+  }
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message.type === "runNow") {
-      await resetRunCaptureLink();
+      await resetRunCaptures();
       await chrome.storage.local.set({
         cremaAutomationRunning: true,
         cremaAutomationPhase: "review",
@@ -79,7 +119,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "runCaptureTest") {
-      await resetRunCaptureLink();
+      await resetRunCaptures();
       await chrome.storage.local.set({
         cremaAutomationRunning: true,
         cremaAutomationPhase: "capture_test",
@@ -94,7 +134,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "runSheetTest") {
-      await resetRunCaptureLink();
+      await resetRunCaptures();
       await chrome.storage.local.set({
         cremaAutomationRunning: true,
         cremaAutomationPhase: "sheet_test",
@@ -117,21 +157,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       if (message.status === "success" || message.status === "error") {
         const notificationId = `crema-${Date.now()}`;
-        const captureData = await chrome.storage.local.get({lastCaptureDownloadId: null, notificationDownloadLinks: {}});
-        const canOpenFolder = message.status === "success" && Number.isInteger(captureData.lastCaptureDownloadId);
-        if (canOpenFolder) {
-          await chrome.storage.local.set({
-            notificationDownloadLinks: {
-              ...captureData.notificationDownloadLinks,
-              [notificationId]: captureData.lastCaptureDownloadId
-            }
-          });
-        }
+        const stagedCaptures = await captureStore("all");
+        const canDownload = stagedCaptures.length > 0;
         await chrome.notifications.create(notificationId, {
           type: "basic",
           iconUrl: "icon.svg",
           title: message.status === "success" ? "크리마 작업 완료" : "크리마 작업 오류",
-          message: `${message.message || (message.status === "success" ? "작업이 완료되었습니다." : "작업 중 오류가 발생했습니다.")}${canOpenFolder ? "\n알림을 클릭하면 부정리뷰 저장 폴더가 열립니다." : ""}`,
+          message: `${message.message || (message.status === "success" ? "작업이 완료되었습니다." : "작업 중 오류가 발생했습니다.")}${canDownload ? "\n아래 버튼을 눌러 캡처본을 내려받으세요." : ""}`,
+          buttons: canDownload ? [{title: "캡처본 다운받기"}] : [],
           priority: message.status === "error" ? 2 : 1
         });
       }
@@ -145,10 +178,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const date = new Date().toLocaleDateString("sv-SE");
       const suffix = message.index ? `_${String(message.index).padStart(2, "0")}` : `_${message.label || "진단"}`;
       const filename = `${captureFolder ? captureFolder + "/" : ""}${date}${suffix}.png`;
-      const downloadId = await chrome.downloads.download({url: dataUrl, filename, conflictAction: "uniquify", saveAs: false});
-      const completed = await waitForDownload(downloadId);
-      await chrome.storage.local.set({lastCaptureDownloadId: downloadId});
-      sendResponse({ok: true, downloadId, filename, savedPath: completed.filename});
+      await captureStore("add", {dataUrl, filename});
+      sendResponse({ok: true, filename, savedPath: `임시 보관: ${filename}`});
       return;
     }
     if (message.type === "captureRaw") {
@@ -183,10 +214,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const reviewId = safeFilenamePart(message.reviewId);
       const identity = reviewId ? `${reviewId}_` : "";
       const filename = `${captureFolder ? captureFolder + "/" : ""}${date}_${identity}${String(message.index).padStart(2, "0")}_${message.part}${message.page > 1 ? `_${String(message.page).padStart(2, "0")}` : ""}.png`;
-      const downloadId = await chrome.downloads.download({url: message.dataUrl, filename, conflictAction: "uniquify", saveAs: false});
-      const completed = await waitForDownload(downloadId);
-      await chrome.storage.local.set({lastCaptureDownloadId: downloadId});
-      sendResponse({ok: true, downloadId, filename, savedPath: completed.filename});
+      await captureStore("add", {dataUrl: message.dataUrl, filename});
+      sendResponse({ok: true, filename, savedPath: `임시 보관: ${filename}`});
       return;
     }
     if (message.type === "log") {
