@@ -66,6 +66,10 @@
   }
 
   function masterCheckbox() {
+    const exact = document.querySelector(
+      "[class*='new-reviews-table__row-select--head'] input[class*='AppCheckbox__input'], #new-reviews-table__row-select input[class*='AppCheckbox__input']"
+    );
+    if (exact && visible(exact)) return exact;
     const tables = [...document.querySelectorAll("table")].filter(visible);
     for (const table of tables) {
       const checkbox = table.querySelector("thead input[type='checkbox'],thead [role='checkbox']");
