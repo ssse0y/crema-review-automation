@@ -120,17 +120,17 @@
     }
     if (!dialog) throw new Error("목록의 적립금 지급 버튼을 눌렀지만 최종 지급 팝업이 열리지 않았습니다.");
 
-    const finalPayButton = [...dialog.querySelectorAll("button,a,[role=button],[onclick]")]
-      .filter(el => visible(el) && compact(el.innerText) === "적립금지급" && !el.disabled && el.getAttribute("aria-disabled") !== "true")
-      .sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
+    const finalPayButton = dialog.querySelector(
+      '[class*="AppModalLayout__footer"] button[class*="AppButton__button--style-blue"]'
+    );
     if (!finalPayButton) throw new Error("최종 지급 팝업의 파란 ‘적립금 지급’ 버튼을 찾지 못했습니다.");
-    // Chrome이 실행 시점의 버튼 위치를 직접 계산해 실제 마우스 클릭을 보낸다.
+    // 개발자 도구에서 확인된 모달 푸터의 파란 지급 버튼을 페이지 영역에서 실행한다.
     finalPayButton.scrollIntoView({block: "center", inline: "center"});
     await wait(200);
     const marker = `crema-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     finalPayButton.setAttribute("data-crema-final-pay", marker);
     const pageClick = await chrome.runtime.sendMessage({
-      type: "trustedButtonClick",
+      type: "mainWorldFinalPay",
       marker
     });
     finalPayButton.removeAttribute("data-crema-final-pay");
