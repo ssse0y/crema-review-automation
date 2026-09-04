@@ -91,6 +91,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastRunDetail: message.detail || "",
         lastRunAt: new Date().toISOString()
       });
+      if (message.status === "success" || message.status === "error") {
+        await chrome.notifications.create(`crema-${Date.now()}`, {
+          type: "basic",
+          iconUrl: "icon.svg",
+          title: message.status === "success" ? "크리마 작업 완료" : "크리마 작업 오류",
+          message: message.message || (message.status === "success" ? "작업이 완료되었습니다." : "작업 중 오류가 발생했습니다."),
+          priority: message.status === "error" ? 2 : 1
+        });
+      }
       sendResponse({ok: true});
       return;
     }
