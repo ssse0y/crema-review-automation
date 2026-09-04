@@ -431,9 +431,12 @@
       : rows.length
       ? `${rows.length}건을 캡처·기록했습니다.${sheetWrite?.skipped ? ` 중복 ${sheetWrite.skipped}건은 제외했습니다.` : ""}`
       : "캡처 조건을 만족하는 부정 리뷰가 없습니다.";
-    await setStatus(sheetError ? "error" : "success", payment.paid
+    const completionMessage = rows.length === 0
+      ? (payment.paid ? "확인된 부정리뷰가 없습니다. 적립금 지급은 완료되었습니다." : "확인된 부정리뷰가 없습니다. 지급 대상도 없습니다.")
+      : payment.paid
       ? (sheetError ? "적립금은 지급했지만 시트 기록에 실패했습니다." : "부정 리뷰 처리와 적립금 지급이 완료되었습니다.")
-      : (sheetError ? "시트 기록에 실패했으며 지급 대상은 없습니다." : "부정 리뷰 처리가 완료되었으며 지급 대상은 없습니다."), detail);
+      : (sheetError ? "시트 기록에 실패했으며 지급 대상은 없습니다." : "부정 리뷰 처리가 완료되었으며 지급 대상은 없습니다.");
+    await setStatus(sheetError ? "error" : "success", completionMessage, detail);
     await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
   }
   run().catch(async error => {
