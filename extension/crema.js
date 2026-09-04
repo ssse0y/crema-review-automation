@@ -334,11 +334,11 @@
     }
     await log("확장 프로그램 실행 시작");
     const onReviewAdmin = location.hostname === "admin.cre.ma" && location.pathname.startsWith("/v2/review/");
-    const reachedNewReviews = onReviewAdmin ? await click("신규 리뷰 관리") : false;
+    const alreadyOnNewReviews = onReviewAdmin && location.pathname.includes("/new_reviews");
+    const reachedNewReviews = alreadyOnNewReviews || (onReviewAdmin ? await click("신규 리뷰 관리") : false);
     const phase = state.cremaAutomationPhase || "review";
-    const reachedTargetTab = reachedNewReviews && (phase === "payment"
-      ? await click("적립금 지급 필요")
-      : await clickExact("전체"));
+    const alreadyOnPaymentTab = new URL(location.href).searchParams.get("tab") === "mileage_required";
+    const reachedTargetTab = reachedNewReviews && (alreadyOnPaymentTab || await clickExact("적립금 지급 필요", document, 10000));
     if (!reachedTargetTab) {
       const labels = [...document.querySelectorAll("button,a,[role=button]")]
         .filter(visible).map(el => (el.innerText || el.getAttribute("aria-label") || "").trim())
@@ -428,7 +428,6 @@
       }
     }
     await chrome.storage.local.set({cremaAutomationPhase: "payment"});
-    if (!await click("적립금 지급 필요")) throw new Error("부정 리뷰 기록 후 ‘적립금 지급 필요’ 탭으로 이동하지 못했습니다.");
     const payment = await payoutCurrentTab();
     const detail = sheetError
       ? `${rows.length}건의 캡처는 저장했지만 시트 기록에 실패했습니다. 대기 데이터는 보관했습니다. 원인: ${sheetError}`

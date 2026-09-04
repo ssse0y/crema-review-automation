@@ -29,7 +29,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastRunAt: new Date().toISOString()
       });
       const stamp = Date.now();
-      await chrome.tabs.create({url: `https://admin.cre.ma/v2/review/caution_reviews?crema_auto=1&run=${stamp}`});
+      await chrome.tabs.create({url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
       sendResponse({ok: true});
       return;
     }
