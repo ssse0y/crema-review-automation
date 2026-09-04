@@ -553,9 +553,18 @@
       } else {
         throw new Error("리뷰 본문 아래의 AppContainer 박스를 찾지 못했습니다.");
       }
-      await closeModal(modal);
       if (captureCount < 2) throw new Error(`테스트 캡처가 ${captureCount}개만 저장되어 상품·아이디 및 리뷰 본문 캡처를 완료하지 못했습니다.`);
-      await setStatus("success", `첫 번째 리뷰 캡처 테스트가 완료되었습니다. PNG ${captureCount}개를 저장했습니다.`, "스프레드시트 기록과 적립금 지급은 실행하지 않았습니다.");
+      const row = {
+        id: labelValue(modal, "작성자 아이디"),
+        date: reviewDate(modal),
+        product: productName(modal),
+        content: reviewContent(modal)
+      };
+      if (!row.id || !row.date || !row.product || !row.content) throw new Error(`시트 기록값 추출 실패: ${JSON.stringify(row)}`);
+      const sheetResult = await chrome.runtime.sendMessage({type: "writeSheet", rows: [row]});
+      if (!sheetResult?.ok) throw new Error(`Google Sheets 기록 실패: ${sheetResult?.error || "알 수 없는 오류"}`);
+      await closeModal(modal);
+      await setStatus("success", `캡처·저장·시트 기록 테스트가 완료되었습니다. PNG ${captureCount}개, 시트 ${sheetResult.inserted || 0}행`, sheetResult.skipped ? "같은 리뷰가 이미 기록되어 시트 중복 추가는 제외했습니다. 적립금은 지급하지 않았습니다." : "적립금은 지급하지 않았습니다.");
       await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
       return;
     }

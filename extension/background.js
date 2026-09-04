@@ -61,7 +61,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         cremaAutomationRunning: true,
         cremaAutomationPhase: "capture_test",
         lastRunStatus: "running",
-        lastRunMessage: "첫 번째 리뷰 캡처를 테스트하고 있습니다.",
+        lastRunMessage: "첫 번째 리뷰의 캡처·저장·시트 기록을 테스트하고 있습니다.",
         lastRunDetail: "",
         lastRunAt: new Date().toISOString()
       });

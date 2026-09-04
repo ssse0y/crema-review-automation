@@ -143,10 +143,10 @@ savedSheetUrl.addEventListener("click", async event => {
 captureTest.addEventListener("click", async () => {
   await chrome.storage.local.set({captureFolder: folder.value.trim()});
   captureTest.disabled = true;
-  status.textContent = "첫 번째 리뷰의 캡처 테스트를 시작합니다…";
+  status.textContent = "첫 번째 리뷰의 캡처·저장·시트 기록 테스트를 시작합니다…";
   const result = await chrome.runtime.sendMessage({type: "runCaptureTest"});
   if (!result?.ok) {
-    renderRunStatus({lastRunStatus: "error", lastRunMessage: "캡처 테스트를 시작하지 못했습니다.", lastRunDetail: result?.error || "알 수 없는 오류"});
+    renderRunStatus({lastRunStatus: "error", lastRunMessage: "캡처·시트 기록 테스트를 시작하지 못했습니다.", lastRunDetail: result?.error || "알 수 없는 오류"});
     return;
   }
   setTimeout(() => window.close(), 700);
