@@ -185,8 +185,17 @@
     const failed = Number((resultText.match(/실패\s*([\d,]+)\s*건/)?.[1] || "0").replaceAll(",", ""));
     if (success <= 0 && failed > 0) throw new Error(`적립금 지급 결과가 모두 실패했습니다. 결과: ${resultText.replace(/\s+/g, " ").trim()}`);
     if (success <= 0) throw new Error(`지급 결과창에서 성공 건수를 확인하지 못했습니다. 결과: ${resultText.replace(/\s+/g, " ").trim()}`);
-    const close = resultDialog.querySelector("button.AppModalHeaderCloseButton, button[class*='AppModalHeaderCloseButton']");
-    if (!close) throw new Error("지급 결과창의 X 버튼을 찾지 못했습니다.");
+    let close = null;
+    for (let i = 0; i < 300 && !close; i++) {
+      close = [...document.querySelectorAll("button.AppModalHeaderCloseButton, button[class*='AppModalHeaderCloseButton']")]
+        .find(button => {
+          if (!visible(button)) return false;
+          const owner = button.closest("div.AppModal");
+          return owner && compact(owner.innerText).includes("선택리뷰적립금지급결과");
+        }) || resultDialog.querySelector("button.AppModalHeaderCloseButton, button[class*='AppModalHeaderCloseButton']");
+      if (!close) await wait(200);
+    }
+    if (!close) throw new Error("지급 결과창이 나타났지만 60초 안에 X 버튼이 준비되지 않았습니다.");
     close.click();
     for (let i = 0; i < 50 && visible(resultDialog); i++) await wait(100);
     if (visible(resultDialog)) throw new Error("지급 결과창의 X 버튼을 눌렀지만 창이 닫히지 않았습니다.");
