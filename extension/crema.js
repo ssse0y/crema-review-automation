@@ -173,13 +173,25 @@
     });
     finalPayButton.removeAttribute("data-crema-final-pay");
     if (!pageClick?.ok) throw new Error(`최종 적립금 지급 버튼 실행 실패: ${pageClick?.error || "알 수 없는 오류"}`);
-    for (let i = 0; i < 150 && visible(dialog); i++) await wait(200);
-    if (visible(dialog)) throw new Error(`최종 적립금 지급 후에도 지급 팝업이 닫히지 않았습니다. 버튼 정보: ${JSON.stringify(pageClick.info || {})}`);
-    const paymentNotice = compact(document.body.innerText);
-    if (!/(적립금지급.{0,20}(진행|처리|요청|완료)|(진행|처리)중.{0,20}적립금)/.test(paymentNotice)) {
-      throw new Error("지급 팝업은 닫혔지만 ‘적립금 지급 중’ 알림을 확인하지 못했습니다. 실제 지급 여부를 확인해주세요.");
+    let resultDialog = null;
+    for (let i = 0; i < 300 && !resultDialog; i++) {
+      resultDialog = [...document.querySelectorAll(".the-dialogs > .AppModal, #the-dialogs > .AppModal, div.AppModal")]
+        .find(el => visible(el) && compact(el.innerText).includes("선택리뷰적립금지급결과")) || null;
+      if (!resultDialog) await wait(200);
     }
-    await log("최종 적립금 지급 버튼 1회 클릭 완료");
+    if (!resultDialog) throw new Error("파란 적립금 지급 버튼을 눌렀지만 60초 안에 지급 결과창이 나타나지 않았습니다.");
+    const resultText = resultDialog.innerText || "";
+    const success = Number((resultText.match(/성공\s*([\d,]+)\s*건/)?.[1] || "0").replaceAll(",", ""));
+    const failed = Number((resultText.match(/실패\s*([\d,]+)\s*건/)?.[1] || "0").replaceAll(",", ""));
+    if (success <= 0 && failed > 0) throw new Error(`적립금 지급 결과가 모두 실패했습니다. 결과: ${resultText.replace(/\s+/g, " ").trim()}`);
+    if (success <= 0) throw new Error(`지급 결과창에서 성공 건수를 확인하지 못했습니다. 결과: ${resultText.replace(/\s+/g, " ").trim()}`);
+    const close = resultDialog.querySelector("button.AppModalHeaderCloseButton, button[class*='AppModalHeaderCloseButton']");
+    if (!close) throw new Error("지급 결과창의 X 버튼을 찾지 못했습니다.");
+    close.click();
+    for (let i = 0; i < 50 && visible(resultDialog); i++) await wait(100);
+    if (visible(resultDialog)) throw new Error("지급 결과창의 X 버튼을 눌렀지만 창이 닫히지 않았습니다.");
+    await log(`적립금 지급 1회 완료: 성공 ${success}건, 실패 ${failed}건`);
+    return {success, failed};
   }
 
   function containerFor(status) {
@@ -509,18 +521,101 @@
     await wait(500);
   }
 
-  async function payoutCurrentTab() {
-    const pageText = document.body.innerText || "";
-    const resultMatch = pageText.match(/([\d,]+)\s*개의\s*결과/);
-    const resultCount = resultMatch ? Number(resultMatch[1].replaceAll(",", "")) : null;
-    const explicitlyEmpty = resultCount === 0 || /지급할 리뷰가 없습니다|검색 결과가 없습니다/.test(pageText);
-    if (explicitlyEmpty) return {paid: false, count: 0};
-    currentStage = "적립금 지급";
-    await setStatus("running", resultCount === null
-      ? "지급 대상 리뷰를 전체 선택하고 있습니다."
-      : `리뷰 ${resultCount}건의 적립금을 지급하고 있습니다.`, "");
-    await payAllRewards();
-    return {paid: true, count: resultCount};
+  async function payoutCurrentTab(onNextBatch = null) {
+    let totalPaid = 0;
+    for (let round = 1; round <= 100; round++) {
+      let pageText = document.body.innerText || "";
+      if (/지급할 리뷰가 없습니다|검색 결과가 없습니다/.test(pageText)) {
+        return {paid: totalPaid > 0, count: totalPaid, rounds: round - 1};
+      }
+      if (round > 1 && onNextBatch) {
+        currentStage = `${round}회차 부정 리뷰 확인`;
+        await onNextBatch(round);
+        pageText = document.body.innerText || "";
+      }
+      const resultMatch = pageText.match(/([\d,]+)\s*개의\s*결과/);
+      const beforeCount = resultMatch ? Number(resultMatch[1].replaceAll(",", "")) : null;
+      const beforeSignature = [...document.querySelectorAll('span[class*="ReviewReviewsReviewCell__message"]')]
+        .filter(visible).slice(0, 3).map(el => compact(el.innerText)).join("|");
+      const explicitlyEmpty = beforeCount === 0 || /지급할 리뷰가 없습니다|검색 결과가 없습니다/.test(pageText);
+      if (explicitlyEmpty) return {paid: totalPaid > 0, count: totalPaid, rounds: round - 1};
+      currentStage = `적립금 지급 ${round}회차`;
+      await setStatus("running", beforeCount === null
+        ? `${round}회차 지급 대상 리뷰를 전체 선택하고 있습니다.`
+        : `${round}회차 적립금 지급 중입니다. 현재 남은 리뷰 ${beforeCount}건`, `누적 지급 ${totalPaid}건`);
+      const batch = await payAllRewards();
+      totalPaid += batch.success;
+
+      let refreshed = false;
+      for (let i = 0; i < 300; i++) {
+        const updatedText = document.body.innerText || "";
+        const updatedMatch = updatedText.match(/([\d,]+)\s*개의\s*결과/);
+        const updatedCount = updatedMatch ? Number(updatedMatch[1].replaceAll(",", "")) : null;
+        const updatedSignature = [...document.querySelectorAll('span[class*="ReviewReviewsReviewCell__message"]')]
+          .filter(visible).slice(0, 3).map(el => compact(el.innerText)).join("|");
+        if (/지급할 리뷰가 없습니다|검색 결과가 없습니다/.test(updatedText) || updatedCount === 0 ||
+            (beforeCount !== null && updatedCount !== null && updatedCount < beforeCount) ||
+            (beforeSignature && updatedSignature && updatedSignature !== beforeSignature)) {
+          refreshed = true;
+          break;
+        }
+        await wait(200);
+      }
+      if (!refreshed) throw new Error(`${round}회차 지급 후 60초 동안 목록이 갱신되지 않았습니다. 중복 지급 방지를 위해 중단합니다.`);
+    }
+    throw new Error("적립금 지급이 100회 반복되어 안전을 위해 중단했습니다.");
+  }
+
+  async function captureNegativeReviews(rows, seenReviews) {
+    const reviewTable = [...document.querySelectorAll("table")]
+      .find(table => visible(table) && compact(table.querySelector("thead")?.innerText).includes("리뷰상세내용"));
+    const tableRows = reviewTable ? [...reviewTable.querySelectorAll("tbody tr")].filter(visible) : [];
+    const statuses = [...document.querySelectorAll("body *")].filter(el => visible(el) && (el.innerText || "").trim() === "부정 리뷰");
+    const listRows = tableRows.length ? tableRows : [...new Set(statuses.map(status => status.closest("tr") || containerFor(status)))];
+    const reviewMessages = [...document.querySelectorAll('span[class*="ReviewReviewsReviewCell__message"]')].filter(visible);
+    const reviewTargets = reviewMessages.length ? reviewMessages : listRows;
+    const added = [];
+    for (const reviewTarget of reviewTargets) {
+      const detailCell = reviewDetailCell(reviewTarget);
+      detailCell.scrollIntoView({block: "center"});
+      await wait(250);
+      detailCell.click();
+      let modal = await waitForModal();
+      if (!modal) {
+        await log("리뷰 상세 내용 텍스트 클릭 후 팝업을 찾지 못함");
+        continue;
+      }
+      modal = await waitForReviewCaptureNodes(modal);
+      await resetModalToTop(modal);
+      const bodyText = reviewContent(modal);
+      const modalText = modal.innerText || "";
+      const row = {
+        id: labelValue(modal, "작성자 아이디"),
+        date: reviewDate(modal),
+        product: productName(modal),
+        content: bodyText,
+        raw: modalText
+      };
+      const ratingMatch = modalText.match(/(?:별점\s*)?([1-5])\s*\/\s*5|(?:별점|평점)\s*[:：]?\s*([1-5])(?:\.0)?\s*점?/);
+      const rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[2]) : 0;
+      const qualifies = (rating >= 1 && rating <= 3) || ANGER.some(word => bodyText.includes(word));
+      const reviewKey = `${row.id}|${row.date}|${row.product}|${row.content}`;
+      if (qualifies && !seenReviews.has(reviewKey)) {
+        seenReviews.add(reviewKey);
+        const index = rows.length + 1;
+        await captureClonedNodes(topReviewNodes(modal), index, "상품및작성자", row.id);
+        const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
+        const reviewCard = sectionCard(modal, "리뷰 본문");
+        if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
+          await captureClonedNodes([attachmentCard], index, "첨부사진", row.id);
+        }
+        if (reviewCard) await captureClonedNodes([reviewCard], index, "리뷰본문", row.id);
+        rows.push(row);
+        added.push(row);
+      }
+      await closeModal(modal);
+    }
+    return added;
   }
 
   async function run() {
@@ -634,61 +729,14 @@
     }
     if (phase === "payment") {
       const payment = await payoutCurrentTab();
-      await setStatus("success", payment.paid ? "적립금 지급이 완료되었습니다." : "지급이 필요한 리뷰가 없습니다.", "");
+      await setStatus("success", payment.paid ? `리뷰 ${payment.count}건의 적립금 지급을 완료했습니다.` : "지급이 필요한 리뷰가 없습니다.", payment.paid ? `${payment.rounds}회에 걸쳐 지급했습니다.` : "");
       await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
       return;
     }
     currentStage = "부정 리뷰 캡처 및 저장";
-    const reviewTable = [...document.querySelectorAll("table")]
-      .find(table => visible(table) && compact(table.querySelector("thead")?.innerText).includes("리뷰상세내용"));
-    const tableRows = reviewTable ? [...reviewTable.querySelectorAll("tbody tr")].filter(visible) : [];
-    const statuses = [...document.querySelectorAll("body *")].filter(el => visible(el) && (el.innerText || "").trim() === "부정 리뷰");
-    const listRows = tableRows.length ? tableRows : [...new Set(statuses.map(status => status.closest("tr") || containerFor(status)))];
-    const reviewMessages = [...document.querySelectorAll('span[class*="ReviewReviewsReviewCell__message"]')].filter(visible);
-    const reviewTargets = reviewMessages.length ? reviewMessages : listRows;
     const rows = [];
-    for (const reviewTarget of reviewTargets) {
-      const detailCell = reviewDetailCell(reviewTarget);
-      detailCell.scrollIntoView({block: "center"});
-      await wait(250);
-      detailCell.click();
-      let modal = await waitForModal();
-      if (!modal) {
-        await log("리뷰 상세 내용 텍스트 클릭 후 팝업을 찾지 못함");
-        continue;
-      }
-      modal = await waitForReviewCaptureNodes(modal);
-      const scroller = scrollBox(modal);
-      await resetModalToTop(modal);
-      const bodyText = reviewContent(modal);
-      const modalText = modal.innerText || "";
-      const row = {
-        id: labelValue(modal, "작성자 아이디"),
-        date: reviewDate(modal),
-        product: productName(modal),
-        content: bodyText,
-        raw: modalText
-      };
-      const ratingMatch = modalText.match(/(?:별점\s*)?([1-5])\s*\/\s*5|(?:별점|평점)\s*[:：]?\s*([1-5])(?:\.0)?\s*점?/);
-      const rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[2]) : 0;
-      const qualifies = (rating >= 1 && rating <= 3) ||
-        ANGER.some(word => bodyText.includes(word));
-      if (qualifies) {
-        const index = rows.length + 1;
-        await captureClonedNodes(topReviewNodes(modal), index, "상품및작성자", row.id);
-
-        const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
-        const reviewCard = sectionCard(modal, "리뷰 본문");
-        if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
-          await captureClonedNodes([attachmentCard], index, "첨부사진", row.id);
-        }
-        if (reviewCard) {
-          await captureClonedNodes([reviewCard], index, "리뷰본문", row.id);
-        }
-        rows.push(row);
-      }
-      await closeModal(modal);
-    }
+    const seenReviews = new Set();
+    await captureNegativeReviews(rows, seenReviews);
     const reviewSave = await chrome.runtime.sendMessage({type: "reviews", rows});
     if (!reviewSave?.ok) throw new Error(`시트 기록 대기 데이터 저장 실패: ${reviewSave?.error || "알 수 없는 오류"}`);
     await log(`부정 리뷰 ${rows.length}건 캡처 및 시트 기록 대기 저장 완료`);
@@ -705,16 +753,29 @@
       }
     }
     await chrome.storage.local.set({cremaAutomationPhase: "payment"});
-    const payment = await payoutCurrentTab();
+    const payment = await payoutCurrentTab(async round => {
+      const added = await captureNegativeReviews(rows, seenReviews);
+      if (!added.length) return;
+      const pendingSave = await chrome.runtime.sendMessage({type: "reviews", rows});
+      if (!pendingSave?.ok) throw new Error(`${round}회차 시트 기록 대기 데이터 저장 실패: ${pendingSave?.error || "알 수 없는 오류"}`);
+      const result = await chrome.runtime.sendMessage({type: "writeSheet", rows: added});
+      if (!result?.ok) {
+        sheetError = [sheetError, `${round}회차: ${result?.error || "알 수 없는 오류"}`].filter(Boolean).join(" / ");
+        await log(`${round}회차 Google Sheets 기록 실패, 적립금 지급은 계속 진행: ${result?.error || "알 수 없는 오류"}`);
+      } else {
+        sheetWrite = result;
+        await log(`${round}회차 Google Sheets에 ${result.inserted || 0}건 기록 완료 (${result.skipped || 0}건 중복 제외)`);
+      }
+    });
     const detail = sheetError
       ? `${rows.length}건의 캡처는 저장했지만 시트 기록에 실패했습니다. 대기 데이터는 보관했습니다. 원인: ${sheetError}`
       : rows.length
       ? `${rows.length}건을 캡처·기록했습니다.${sheetWrite?.skipped ? ` 중복 ${sheetWrite.skipped}건은 제외했습니다.` : ""}`
       : "캡처 조건을 만족하는 부정 리뷰가 없습니다.";
     const completionMessage = rows.length === 0
-      ? (payment.paid ? "확인된 부정리뷰가 없습니다. 적립금 지급은 완료되었습니다." : "확인된 부정리뷰가 없습니다. 지급 대상도 없습니다.")
+      ? (payment.paid ? `확인된 부정리뷰가 없습니다. 리뷰 ${payment.count}건의 적립금 지급을 완료했습니다.` : "확인된 부정리뷰가 없습니다. 지급 대상도 없습니다.")
       : payment.paid
-      ? (sheetError ? "적립금은 지급했지만 시트 기록에 실패했습니다." : "부정 리뷰 처리와 적립금 지급이 완료되었습니다.")
+      ? (sheetError ? `리뷰 ${payment.count}건의 적립금은 지급했지만 시트 기록에 실패했습니다.` : `부정 리뷰 처리와 리뷰 ${payment.count}건의 적립금 지급이 완료되었습니다.`)
       : (sheetError ? "시트 기록에 실패했으며 지급 대상은 없습니다." : "부정 리뷰 처리가 완료되었으며 지급 대상은 없습니다.");
     await setStatus(sheetError ? "error" : "success", completionMessage, detail);
     await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
