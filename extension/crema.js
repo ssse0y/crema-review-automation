@@ -174,12 +174,12 @@
     finalPayButton.removeAttribute("data-crema-final-pay");
     if (!pageClick?.ok) throw new Error(`최종 적립금 지급 버튼 실행 실패: ${pageClick?.error || "알 수 없는 오류"}`);
     let resultDialog = null;
-    for (let i = 0; i < 300 && !resultDialog; i++) {
+    for (let i = 0; i < 450 && !resultDialog; i++) {
       resultDialog = [...document.querySelectorAll(".the-dialogs > .AppModal, #the-dialogs > .AppModal, div.AppModal")]
         .find(el => visible(el) && compact(el.innerText).includes("선택리뷰적립금지급결과")) || null;
       if (!resultDialog) await wait(200);
     }
-    if (!resultDialog) throw new Error("파란 적립금 지급 버튼을 눌렀지만 60초 안에 지급 결과창이 나타나지 않았습니다.");
+    if (!resultDialog) throw new Error("파란 적립금 지급 버튼을 눌렀지만 90초 안에 지급 결과창이 나타나지 않았습니다.");
     const resultText = resultDialog.innerText || "";
     const success = Number((resultText.match(/성공\s*([\d,]+)\s*건/)?.[1] || "0").replaceAll(",", ""));
     const failed = Number((resultText.match(/실패\s*([\d,]+)\s*건/)?.[1] || "0").replaceAll(",", ""));
@@ -598,7 +598,8 @@
       };
       const ratingMatch = modalText.match(/(?:별점\s*)?([1-5])\s*\/\s*5|(?:별점|평점)\s*[:：]?\s*([1-5])(?:\.0)?\s*점?/);
       const rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[2]) : 0;
-      const qualifies = (rating >= 1 && rating <= 3) || ANGER.some(word => bodyText.includes(word));
+      const hasNegativeTag = compact(modalText).includes("부정리뷰");
+      const qualifies = hasNegativeTag || (rating >= 1 && rating <= 3) || ANGER.some(word => bodyText.includes(word));
       const reviewKey = `${row.id}|${row.date}|${row.product}|${row.content}`;
       if (qualifies && !seenReviews.has(reviewKey)) {
         seenReviews.add(reviewKey);
