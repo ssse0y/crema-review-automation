@@ -162,7 +162,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         await chrome.notifications.create(notificationId, {
           type: "basic",
           iconUrl: "icon.png",
-          title: message.status === "success" ? "크리마 작업 완료" : "크리마 작업 오류",
+          title: message.status === "success" ? "크리마 작업 완료" : "크리마 작업 실패",
           message: `${message.message || (message.status === "success" ? "작업이 완료되었습니다." : "작업 중 오류가 발생했습니다.")}${canDownload ? "\n아래 버튼을 눌러 캡처본을 내려받으세요." : ""}`,
           buttons: canDownload ? [{title: "캡처본 다운받기"}] : [],
           priority: message.status === "error" ? 2 : 1
