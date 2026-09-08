@@ -575,6 +575,31 @@
     throw new Error("적립금 지급이 100회 반복되어 안전을 위해 중단했습니다.");
   }
 
+  function coloredStarCount(row) {
+    const rate = row?.querySelector("ul.AppRate, ul[class*='AppRate']");
+    if (!rate) return null;
+    const items = [...rate.querySelectorAll(":scope > li, li[class*='AppRate__item']")];
+    if (!items.length) return null;
+    const warmColor = value => {
+      const rgb = String(value || "").match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+      if (!rgb) return false;
+      const [, red, green, blue] = rgb.map(Number);
+      return red >= 180 && green >= 70 && green < red && blue <= 120 && red - blue >= 80;
+    };
+    return items.filter(item => {
+      if (/active|filled|full|selected/i.test(item.className || "")) return true;
+      return [item, ...item.querySelectorAll("svg,path,use")].some(node => {
+        const style = getComputedStyle(node);
+        return warmColor(style.color) || warmColor(style.fill) || warmColor(style.stroke);
+      });
+    }).length;
+  }
+
+  function hasNegativeReviewTag(row) {
+    return [...(row?.querySelectorAll("[class*='AppBadge']") || [])]
+      .some(badge => compact(badge.innerText) === "부정리뷰");
+  }
+
   async function captureNegativeReviews(rows, seenReviews) {
     const reviewTable = [...document.querySelectorAll("table")]
       .find(table => visible(table) && compact(table.querySelector("thead")?.innerText).includes("리뷰상세내용"));
@@ -585,6 +610,10 @@
     const reviewTargets = reviewMessages.length ? reviewMessages : listRows;
     const added = [];
     for (const reviewTarget of reviewTargets) {
+      const listRow = reviewTarget.closest("[class*='AppResourceTable__body-row']") || containerFor(reviewTarget);
+      const negativeTag = hasNegativeReviewTag(listRow);
+      const listRating = coloredStarCount(listRow);
+      if (!negativeTag || (listRating !== null && listRating > 3)) continue;
       const detailCell = reviewDetailCell(reviewTarget);
       detailCell.scrollIntoView({block: "center"});
       await wait(250);
@@ -606,9 +635,9 @@
         raw: modalText
       };
       const ratingMatch = modalText.match(/(?:별점\s*)?([1-5])\s*\/\s*5|(?:별점|평점)\s*[:：]?\s*([1-5])(?:\.0)?\s*점?/);
-      const rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[2]) : 0;
-      const hasNegativeTag = compact(modalText).includes("부정리뷰");
-      const qualifies = hasNegativeTag || (rating >= 1 && rating <= 3) || ANGER.some(word => bodyText.includes(word));
+      const modalRating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[2]) : null;
+      const rating = listRating ?? modalRating;
+      const qualifies = rating !== null && rating >= 1 && rating <= 3;
       const reviewKey = `${row.id}|${row.date}|${row.product}|${row.content}`;
       if (qualifies && !seenReviews.has(reviewKey)) {
         seenReviews.add(reviewKey);
