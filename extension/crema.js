@@ -580,19 +580,7 @@
     if (!rate) return null;
     const items = [...rate.querySelectorAll(":scope > li, li[class*='AppRate__item']")];
     if (!items.length) return null;
-    const warmColor = value => {
-      const rgb = String(value || "").match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
-      if (!rgb) return false;
-      const [, red, green, blue] = rgb.map(Number);
-      return red >= 180 && green >= 70 && green < red && blue <= 120 && red - blue >= 80;
-    };
-    return items.filter(item => {
-      if (/active|filled|full|selected/i.test(item.className || "")) return true;
-      return [item, ...item.querySelectorAll("svg,path,use")].some(node => {
-        const style = getComputedStyle(node);
-        return warmColor(style.color) || warmColor(style.fill) || warmColor(style.stroke);
-      });
-    }).length;
+    return items.filter(item => item.querySelector("svg[class*='AppRate__icon--fill']")).length;
   }
 
   function hasNegativeReviewTag(row) {
