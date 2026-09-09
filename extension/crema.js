@@ -173,31 +173,30 @@
     });
     finalPayButton.removeAttribute("data-crema-final-pay");
     if (!pageClick?.ok) throw new Error(`최종 적립금 지급 버튼 실행 실패: ${pageClick?.error || "알 수 없는 오류"}`);
-    // 크리마의 지급 처리가 끝날 시간을 확보한 뒤 결과창을 닫는다.
-    await wait(40000);
     let resultDialog = null;
-    for (let i = 0; i < 50 && !resultDialog; i++) {
-      resultDialog = [...document.querySelectorAll(".the-dialogs > .AppModal, #the-dialogs > .AppModal, div.AppModal")]
+    let close = null;
+    for (let i = 0; i < 300; i++) {
+      const candidate = [...document.querySelectorAll(".the-dialogs > .AppModal, #the-dialogs > .AppModal, div.AppModal")]
         .find(el => visible(el) && compact(el.innerText).includes("선택리뷰적립금지급결과")) || null;
-      if (!resultDialog) await wait(200);
+      const resultText = candidate?.innerText || "";
+      const countsReady = /성공\s*[\d,]+\s*건/.test(resultText) &&
+        /생략[^\n]*\s*[\d,]+\s*건/.test(resultText) &&
+        /실패\s*[\d,]+\s*건/.test(resultText);
+      const closeButton = candidate?.querySelector("button.AppModalHeadCloseButton, button[class*='AppModalHeadCloseButton']") || null;
+      if (candidate && countsReady && closeButton && visible(closeButton)) {
+        resultDialog = candidate;
+        close = closeButton;
+        break;
+      }
+      await wait(200);
     }
-    if (!resultDialog) throw new Error("적립금 지급 후 40초를 기다렸지만 지급 결과창을 찾지 못했습니다.");
+    if (!resultDialog || !close) throw new Error("60초 안에 지급 결과와 X 버튼이 모두 준비되지 않았습니다.");
     const resultText = resultDialog.innerText || "";
     const success = Number((resultText.match(/성공\s*([\d,]+)\s*건/)?.[1] || "0").replaceAll(",", ""));
     const failed = Number((resultText.match(/실패\s*([\d,]+)\s*건/)?.[1] || "0").replaceAll(",", ""));
     if (success <= 0 && failed > 0) throw new Error(`적립금 지급 결과가 모두 실패했습니다. 결과: ${resultText.replace(/\s+/g, " ").trim()}`);
     if (success <= 0) throw new Error(`지급 결과창에서 성공 건수를 확인하지 못했습니다. 결과: ${resultText.replace(/\s+/g, " ").trim()}`);
-    let close = null;
-    for (let i = 0; i < 50 && !close; i++) {
-      close = [...document.querySelectorAll("button.AppModalHeadCloseButton, button[class*='AppModalHeadCloseButton']")]
-        .find(button => {
-          if (!visible(button)) return false;
-          const owner = button.closest("div.AppModal");
-          return owner && compact(owner.innerText).includes("선택리뷰적립금지급결과");
-        }) || resultDialog.querySelector("button.AppModalHeadCloseButton, button[class*='AppModalHeadCloseButton']");
-      if (!close) await wait(200);
-    }
-    if (!close) throw new Error("40초 대기 후 지급 결과창의 X 버튼을 찾지 못했습니다.");
+    await wait(1000);
     close.click();
     for (let i = 0; i < 50 && visible(resultDialog); i++) await wait(100);
     if (visible(resultDialog)) throw new Error("지급 결과창의 X 버튼을 눌렀지만 창이 닫히지 않았습니다.");
