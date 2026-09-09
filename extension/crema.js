@@ -684,45 +684,23 @@
       return;
     }
     if (phase === "capture_test") {
-      currentStage = "첫 번째 리뷰 캡처 테스트";
-      let message = null;
-      for (let i = 0; i < 30 && !message; i++) {
-        message = [...document.querySelectorAll('span[class*="ReviewReviewsReviewCell__message"]')].find(visible) || null;
-        if (!message) await wait(200);
+      currentStage = "부정리뷰 캡처·시트 테스트";
+      const rows = [];
+      await captureNegativeReviews(rows, new Set());
+      let sheetResult = {inserted: 0, skipped: 0};
+      if (rows.length) {
+        const pending = await chrome.runtime.sendMessage({type: "reviews", rows});
+        if (!pending?.ok) throw new Error(`테스트 데이터 임시 저장 실패: ${pending?.error || "알 수 없는 오류"}`);
+        sheetResult = await chrome.runtime.sendMessage({type: "writeSheet", rows});
+        if (!sheetResult?.ok) throw new Error(`Google Sheets 기록 실패: ${sheetResult?.error || "알 수 없는 오류"}`);
       }
-      if (!message) throw new Error("캡처 테스트에 사용할 리뷰 내용을 찾지 못했습니다.");
-      message.scrollIntoView({block: "center"});
-      await wait(250);
-      message.click();
-      let modal = await waitForModal();
-      if (!modal) throw new Error("첫 번째 리뷰 상세 팝업이 화면에 나타나지 않았습니다.");
-      modal = await waitForReviewCaptureNodes(modal);
-      const scroller = scrollBox(modal);
-      await resetModalToTop(modal);
-      const testId = labelValue(modal, "작성자 아이디") || "테스트";
-      let captureCount = await captureClonedNodes(topReviewNodes(modal), 1, "상품및작성자_테스트", testId);
-      const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
-      const reviewCard = sectionCard(modal, "리뷰 본문");
-      if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
-        captureCount += await captureClonedNodes([attachmentCard], 1, "첨부사진_테스트", testId);
-      }
-      if (reviewCard) {
-        captureCount += await captureClonedNodes([reviewCard], 1, "리뷰본문_테스트", testId);
-      } else {
-        throw new Error("리뷰 본문 아래의 AppContainer 박스를 찾지 못했습니다.");
-      }
-      if (captureCount < 2) throw new Error(`테스트 캡처가 ${captureCount}개만 저장되어 상품·아이디 및 리뷰 본문 캡처를 완료하지 못했습니다.`);
-      const row = {
-        id: labelValue(modal, "작성자 아이디"),
-        date: reviewDate(modal),
-        product: productName(modal),
-        content: reviewContent(modal)
-      };
-      if (!row.id || !row.date || !row.product || !row.content) throw new Error(`시트 기록값 추출 실패: ${JSON.stringify(row)}`);
-      const sheetResult = await chrome.runtime.sendMessage({type: "writeSheet", rows: [row]});
-      if (!sheetResult?.ok) throw new Error(`Google Sheets 기록 실패: ${sheetResult?.error || "알 수 없는 오류"}`);
-      await closeModal(modal);
-      await setStatus("success", `캡처·시트 기록 테스트가 완료되었습니다. PNG ${captureCount}개 임시 보관, 시트 ${sheetResult.inserted || 0}행`, sheetResult.skipped ? "같은 리뷰가 이미 기록되어 시트 중복 추가는 제외했습니다. 완료 알림의 버튼으로 캡처본을 내려받을 수 있습니다. 적립금은 지급하지 않았습니다." : "완료 알림의 버튼으로 캡처본을 내려받을 수 있습니다. 적립금은 지급하지 않았습니다.");
+      const message = rows.length
+        ? `부정리뷰 ${rows.length}건 캡처·시트 테스트 완료 · 시트 ${sheetResult.inserted || 0}행 기록`
+        : "현재 목록에서 조건에 맞는 부정리뷰가 발견되지 않았습니다.";
+      const detail = rows.length
+        ? `중복 ${sheetResult.skipped || 0}건 제외 · 적립금은 지급하지 않았습니다. 알림의 버튼으로 캡처본을 내려받을 수 있습니다.`
+        : "적립금은 지급하지 않았습니다.";
+      await setStatus("success", message, detail);
       await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
       return;
     }
