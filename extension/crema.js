@@ -592,12 +592,25 @@
   }
 
   async function captureNegativeReviews(rows, seenReviews) {
+    let loadedMessages = [];
+    let confirmedEmpty = false;
+    for (let i = 0; i < 150; i++) {
+      loadedMessages = [...document.querySelectorAll('span[class*="ReviewReviewsReviewCell__message"]')].filter(visible);
+      const pageText = document.body.innerText || "";
+      confirmedEmpty = /지급할 리뷰가 없습니다|검색 결과가 없습니다/.test(pageText) || /0\s*개의\s*결과/.test(pageText);
+      if (loadedMessages.length || confirmedEmpty) break;
+      await wait(200);
+    }
+    if (!loadedMessages.length && !confirmedEmpty) {
+      throw new Error("리뷰 목록이 30초 안에 화면에 나타나지 않았습니다. 목록 로딩 후 다시 시도해주세요.");
+    }
+    if (confirmedEmpty) return [];
     const reviewTable = [...document.querySelectorAll("table")]
       .find(table => visible(table) && compact(table.querySelector("thead")?.innerText).includes("리뷰상세내용"));
     const tableRows = reviewTable ? [...reviewTable.querySelectorAll("tbody tr")].filter(visible) : [];
     const statuses = [...document.querySelectorAll("body *")].filter(el => visible(el) && (el.innerText || "").trim() === "부정 리뷰");
     const listRows = tableRows.length ? tableRows : [...new Set(statuses.map(status => status.closest("tr") || containerFor(status)))];
-    const reviewMessages = [...document.querySelectorAll('span[class*="ReviewReviewsReviewCell__message"]')].filter(visible);
+    const reviewMessages = loadedMessages;
     const reviewTargets = reviewMessages.length ? reviewMessages : listRows;
     const added = [];
     for (const reviewTarget of reviewTargets) {
