@@ -603,7 +603,9 @@
       const listRow = reviewTarget.closest("[class*='AppResourceTable__body-row']") || containerFor(reviewTarget);
       const negativeTag = hasNegativeReviewTag(listRow);
       const listRating = coloredStarCount(listRow);
-      if (!negativeTag || (listRating !== null && listRating > 3)) continue;
+      const negativePreview = ANGER.some(word => (listRow?.innerText || "").includes(word));
+      const lowListRating = listRating !== null && listRating >= 1 && listRating <= 3;
+      if (!negativeTag && !lowListRating && !negativePreview) continue;
       const detailCell = reviewDetailCell(reviewTarget);
       detailCell.scrollIntoView({block: "center"});
       await wait(250);
@@ -627,7 +629,8 @@
       const ratingMatch = modalText.match(/(?:별점\s*)?([1-5])\s*\/\s*5|(?:별점|평점)\s*[:：]?\s*([1-5])(?:\.0)?\s*점?/);
       const modalRating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[2]) : null;
       const rating = listRating ?? modalRating;
-      const qualifies = rating !== null && rating >= 1 && rating <= 3;
+      const qualifies = negativeTag || (rating !== null && rating >= 1 && rating <= 3) ||
+        ANGER.some(word => bodyText.includes(word));
       const reviewKey = `${row.id}|${row.date}|${row.product}|${row.content}`;
       if (qualifies && !seenReviews.has(reviewKey)) {
         seenReviews.add(reviewKey);
