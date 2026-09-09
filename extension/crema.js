@@ -578,7 +578,7 @@
   }
 
   function coloredStarCount(row) {
-    const rate = row?.querySelector("ul.AppRate, ul[class*='AppRate']");
+    const rate = row?.querySelector("div.table-line--mt4 ul.AppRate, ul.AppRate, ul[class*='AppRate']");
     if (!rate) return null;
     const items = [...rate.querySelectorAll(":scope > li, li[class*='AppRate__item']")];
     if (!items.length) return null;
@@ -586,8 +586,9 @@
   }
 
   function hasNegativeReviewTag(row) {
-    return [...(row?.querySelectorAll("[class*='AppBadge']") || [])]
-      .some(badge => compact(badge.innerText) === "부정리뷰");
+    return Boolean(row?.querySelector("div.AppBadge--red-outline, [class*='AppBadge--red-outline']")) ||
+      [...(row?.querySelectorAll("[class*='AppBadge']") || [])]
+        .some(badge => compact(badge.innerText) === "부정리뷰");
   }
 
   async function captureNegativeReviews(rows, seenReviews) {
