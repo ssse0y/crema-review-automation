@@ -50,7 +50,8 @@ chrome.storage.local.get({lastRunStatus: "", lastRunMessage: "", lastRunDetail: 
 
 chrome.runtime.sendMessage({type: "getStagedCaptures"}).then(result => {
   if (!result?.ok || !result.count) return;
-  captureDownloadInfo.textContent = `임시 보관된 캡처본 ${result.count}개가 있습니다.`;
+  const displayDate = result.captureDate ? `${result.captureDate.replaceAll("-", ". ")}. · ` : "";
+  captureDownloadInfo.textContent = `${displayDate}임시 보관된 캡처본 ${result.count}개가 있습니다.`;
   captureDownloadArea.classList.remove("hidden");
 });
 

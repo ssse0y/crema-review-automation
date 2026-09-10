@@ -169,7 +169,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "getStagedCaptures") {
       await expirePreviousDayResults();
       const captures = await captureStore("all");
-      sendResponse({ok: true, count: captures.length});
+      const captureDate = captures[0]?.filename?.match(/(?:^|\/)(\d{4}-\d{2}-\d{2})/)?.[1] || "";
+      sendResponse({ok: true, count: captures.length, captureDate});
       return;
     }
     if (message.type === "downloadStagedCaptures") {
