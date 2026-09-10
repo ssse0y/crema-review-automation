@@ -1,13 +1,5 @@
 (() => {
   const RUN_KEY = "cremaAutomationRunning";
-  const ANGER = [
-    "구매하지 마", "사지 마", "사지마", "비추천", "절대 사지", "진짜 구매하지",
-    "화딱지", "화가", "화남", "짜증", "열받", "스트레스", "최악", "실망", "답답", "황당",
-    "다시는", "환불", "교환", "돈 아깝", "돈아깝", "구림", "심하다", "말도 안",
-    "안됩니다", "안 됩니다", "못 쓰", "못쓰", "쓰지 못", "불량", "충격", "후회",
-    "추천하지", "별로예요", "별로에요", "아쉬워", "불편", "작동하지", "작동 안",
-    "고장", "파손", "누락", "효과 없", "냄새가", "배송이 느", "품질이"
-  ];
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const visible = el => {
     if (!el || !el.getClientRects().length) return false;
@@ -616,9 +608,8 @@
       const listRow = reviewTarget.closest("[class*='AppResourceTable__body-row']") || containerFor(reviewTarget);
       const negativeTag = hasNegativeReviewTag(listRow);
       const listRating = coloredStarCount(listRow);
-      const negativePreview = ANGER.some(word => (listRow?.innerText || "").includes(word));
       const lowListRating = listRating !== null && listRating >= 1 && listRating <= 3;
-      if (!negativeTag && !lowListRating && !negativePreview) continue;
+      if (!negativeTag && !lowListRating) continue;
       const detailCell = reviewDetailCell(reviewTarget);
       detailCell.scrollIntoView({block: "center"});
       await wait(250);
@@ -642,8 +633,7 @@
       const ratingMatch = modalText.match(/(?:별점\s*)?([1-5])\s*\/\s*5|(?:별점|평점)\s*[:：]?\s*([1-5])(?:\.0)?\s*점?/);
       const modalRating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[2]) : null;
       const rating = listRating ?? modalRating;
-      const qualifies = negativeTag || (rating !== null && rating >= 1 && rating <= 3) ||
-        ANGER.some(word => bodyText.includes(word));
+      const qualifies = negativeTag || (rating !== null && rating >= 1 && rating <= 3);
       const reviewKey = `${row.id}|${row.date}|${row.product}|${row.content}`;
       if (qualifies && !seenReviews.has(reviewKey)) {
         seenReviews.add(reviewKey);
