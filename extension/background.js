@@ -148,6 +148,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ok: true});
       return;
     }
+    if (message.type === "getStagedCaptures") {
+      const captures = await captureStore("all");
+      sendResponse({ok: true, count: captures.length});
+      return;
+    }
+    if (message.type === "downloadStagedCaptures") {
+      const count = await downloadStagedCaptures();
+      sendResponse({ok: true, count});
+      return;
+    }
     if (message.type === "runStatus") {
       await chrome.storage.local.set({
         lastRunStatus: message.status,

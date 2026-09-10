@@ -24,6 +24,9 @@ const sheetApiKey = document.getElementById("sheetApiKey");
 const saveWebAppUrl = document.getElementById("saveWebAppUrl");
 const saveApiKey = document.getElementById("saveApiKey");
 const authState = document.getElementById("authState");
+const captureDownloadArea = document.getElementById("captureDownloadArea");
+const captureDownloadInfo = document.getElementById("captureDownloadInfo");
+const downloadCaptures = document.getElementById("downloadCaptures");
 
 function renderRunStatus(data) {
   const state = data.lastRunStatus || "";
@@ -40,6 +43,27 @@ function renderRunStatus(data) {
 }
 
 chrome.storage.local.get({lastRunStatus: "", lastRunMessage: "", lastRunDetail: ""}).then(renderRunStatus);
+
+chrome.runtime.sendMessage({type: "getStagedCaptures"}).then(result => {
+  if (!result?.ok || !result.count) return;
+  captureDownloadInfo.textContent = `임시 보관된 캡처본 ${result.count}개가 있습니다.`;
+  captureDownloadArea.classList.remove("hidden");
+});
+
+downloadCaptures.addEventListener("click", async () => {
+  downloadCaptures.disabled = true;
+  captureDownloadInfo.textContent = "캡처본 다운로드를 시작하고 있습니다…";
+  const result = await chrome.runtime.sendMessage({type: "downloadStagedCaptures"});
+  if (result?.ok && result.count) {
+    captureDownloadInfo.textContent = `캡처본 ${result.count}개 다운로드를 시작했습니다.`;
+    setTimeout(() => captureDownloadArea.classList.add("hidden"), 1500);
+  } else if (result?.ok) {
+    captureDownloadInfo.textContent = "다운로드할 캡처본이 없습니다.";
+  } else {
+    captureDownloadInfo.textContent = `다운로드 실패: ${result?.error || "알 수 없는 오류"}`;
+    downloadCaptures.disabled = false;
+  }
+});
 
 chrome.storage.local.get({sheetWebAppUrl: "", sheetApiKey: ""}).then(data => {
   webAppUrl.value = data.sheetWebAppUrl;
