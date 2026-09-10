@@ -1,6 +1,4 @@
 const button = document.getElementById("run");
-const captureTest = document.getElementById("captureTest");
-const sheetTest = document.getElementById("sheetTest");
 const status = document.getElementById("status");
 const folder = document.getElementById("folder");
 const editArea = document.getElementById("editArea");
@@ -42,7 +40,13 @@ function renderRunStatus(data) {
   }
 }
 
-chrome.storage.local.get({lastRunStatus: "", lastRunMessage: "", lastRunDetail: ""}).then(renderRunStatus);
+chrome.storage.local.get({lastRunStatus: "", lastRunMessage: "", lastRunDetail: "", lastRunAt: "", cremaAutomationRunning: false}).then(data => {
+  const today = new Date().toLocaleDateString("sv-SE");
+  const runDay = data.lastRunAt ? new Date(data.lastRunAt).toLocaleDateString("sv-SE") : "";
+  renderRunStatus(!data.cremaAutomationRunning && runDay !== today
+    ? {lastRunStatus: "", lastRunMessage: "", lastRunDetail: ""}
+    : data);
+});
 
 chrome.runtime.sendMessage({type: "getStagedCaptures"}).then(result => {
   if (!result?.ok || !result.count) return;
@@ -162,31 +166,6 @@ editSheet.addEventListener("click", () => {
 savedSheetUrl.addEventListener("click", async event => {
   event.preventDefault();
   if (savedSheetUrl.href) await chrome.tabs.create({url: savedSheetUrl.href});
-});
-
-captureTest.addEventListener("click", async () => {
-  await chrome.storage.local.set({captureFolder: folder.value.trim()});
-  captureTest.disabled = true;
-  status.textContent = "현재 목록의 부정리뷰 캡처·시트 기록을 테스트합니다…";
-  const result = await chrome.runtime.sendMessage({type: "runCaptureTest"});
-  if (!result?.ok) {
-    renderRunStatus({lastRunStatus: "error", lastRunMessage: "부정리뷰 캡처·시트 테스트를 시작하지 못했습니다.", lastRunDetail: result?.error || "알 수 없는 오류"});
-    return;
-  }
-  setTimeout(() => window.close(), 700);
-});
-
-sheetTest.addEventListener("click", async () => {
-  sheetTest.disabled = true;
-  status.textContent = "첫 번째 리뷰의 실제 내용을 기록하고 있습니다…";
-  const result = await chrome.runtime.sendMessage({type: "runSheetTest"});
-  if (result?.ok) {
-    setTimeout(() => window.close(), 700);
-  } else {
-    renderRunStatus({lastRunStatus: "error", lastRunMessage: "스프레드시트 입력 테스트에 실패했습니다.", lastRunDetail: result?.error || "알 수 없는 오류"});
-    status.textContent = "";
-  }
-  sheetTest.disabled = false;
 });
 
 button.addEventListener("click", async () => {

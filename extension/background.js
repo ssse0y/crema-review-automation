@@ -64,6 +64,23 @@ async function resetRunCaptures() {
   await captureStore("clear");
 }
 
+function localDateKey(value = new Date()) {
+  return new Date(value).toLocaleDateString("sv-SE");
+}
+
+async function expirePreviousDayResults() {
+  const data = await chrome.storage.local.get({lastRunAt: "", cremaAutomationRunning: false});
+  if (data.cremaAutomationRunning || (data.lastRunAt && localDateKey(data.lastRunAt) === localDateKey())) return false;
+  await captureStore("clear");
+  await chrome.storage.local.set({
+    lastRunStatus: "",
+    lastRunMessage: "",
+    lastRunDetail: "",
+    lastRunAt: ""
+  });
+  return true;
+}
+
 async function downloadStagedCaptures() {
   const captures = await captureStore("all");
   if (!captures.length) return 0;
@@ -82,6 +99,7 @@ async function downloadStagedCaptures() {
 chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIndex) => {
   if (!notificationId.startsWith("crema-") || buttonIndex !== 0) return;
   try {
+    await expirePreviousDayResults();
     const count = await downloadStagedCaptures();
     await chrome.notifications.clear(notificationId);
     await chrome.notifications.create(`crema-download-${Date.now()}`, {
@@ -149,6 +167,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "getStagedCaptures") {
+      await expirePreviousDayResults();
       const captures = await captureStore("all");
       sendResponse({ok: true, count: captures.length});
       return;
