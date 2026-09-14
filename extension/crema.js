@@ -373,12 +373,12 @@
       let rect = stage.getBoundingClientRect();
       const maxHeight = innerHeight - 24;
       if (rect.height > maxHeight) {
-        const scale = maxHeight / rect.height;
-        stage.style.transformOrigin = "top left";
-        stage.style.transform = `scale(${scale})`;
+        stage.style.height = `${maxHeight}px`;
+        stage.style.maxHeight = `${maxHeight}px`;
+        stage.style.overflow = "hidden";
         await wait(150);
         rect = stage.getBoundingClientRect();
-        await log(`${part} 영역을 화면 높이에 맞게 ${Math.round(scale * 100)}%로 축소하여 캡처`);
+        await log(`${part} 영역 중 현재 화면에 들어오는 부분만 캡처`);
       }
       await captureVisibleRect(rect, index, part, reviewId);
       return 1;
