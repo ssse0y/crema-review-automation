@@ -240,10 +240,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "saveCapture") {
       const {captureFolder} = await settings();
-      const date = new Date().toLocaleDateString("sv-SE");
+      const dateMatch = String(message.reviewDate || "").match(/(20\d{2})\D+(\d{1,2})\D+(\d{1,2})/);
+      const date = dateMatch
+        ? `${dateMatch[1]}-${dateMatch[2].padStart(2, "0")}-${dateMatch[3].padStart(2, "0")}`
+        : new Date().toLocaleDateString("sv-SE");
+      const authorName = safeFilenamePart(message.authorName) || "이름없음";
+      const hasRating = message.rating !== null && message.rating !== undefined && message.rating !== "";
+      const rating = Number(message.rating);
+      const ratingLabel = hasRating && Number.isFinite(rating) ? `${rating}점` : "별점미확인";
       const reviewId = safeFilenamePart(message.reviewId);
-      const identity = reviewId ? `${reviewId}_` : "";
-      const filename = `${captureFolder ? captureFolder + "/" : ""}${date}_${identity}${String(message.index).padStart(2, "0")}_${message.part}${message.page > 1 ? `_${String(message.page).padStart(2, "0")}` : ""}.png`;
+      const identity = reviewId ? `_${reviewId}` : "";
+      const filename = `${captureFolder ? captureFolder + "/" : ""}${date}_${authorName}_${ratingLabel}_${message.part}${identity}${message.page > 1 ? `_${String(message.page).padStart(2, "0")}` : ""}.png`;
       await captureStore("add", {dataUrl: message.dataUrl, filename});
       sendResponse({ok: true, filename, savedPath: `임시 보관: ${filename}`});
       return;

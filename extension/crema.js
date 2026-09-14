@@ -352,7 +352,7 @@
       exactText(modal, label)?.closest('[class*="AppDataList__datum"]') || null;
   }
 
-  async function captureClonedNodes(nodes, index, part, reviewId = "") {
+  async function captureClonedNodes(nodes, index, part, captureMeta = {}) {
     const originals = nodes.filter(Boolean);
     if (!originals.length) throw new Error(`${part} 캡처 요소를 찾지 못했습니다.`);
     const stage = document.createElement("div");
@@ -380,7 +380,7 @@
         rect = stage.getBoundingClientRect();
         await log(`${part} 영역 중 현재 화면에 들어오는 부분만 캡처`);
       }
-      await captureVisibleRect(rect, index, part, reviewId);
+      await captureVisibleRect(rect, index, part, captureMeta);
       return 1;
     } finally {
       stage.remove();
@@ -497,7 +497,7 @@
     return page - 1;
   }
 
-  async function captureVisibleRect(rect, index, part, reviewId = "") {
+  async function captureVisibleRect(rect, index, part, captureMeta = {}) {
     const bounded = {
       left: Math.max(0, rect.left),
       top: Math.max(0, rect.top),
@@ -505,7 +505,7 @@
       height: Math.min(innerHeight - Math.max(0, rect.top), rect.height)
     };
     const dataUrl = await cropScreenshot(bounded);
-    const saved = await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page: 1, reviewId});
+    const saved = await chrome.runtime.sendMessage({type: "saveCapture", dataUrl, index, part, page: 1, ...captureMeta});
     if (!saved?.ok) throw new Error(`${part} 캡처 저장 실패: ${saved?.error || "알 수 없는 오류"}`);
     await log(`${part} 캡처 임시 보관 완료: ${saved.savedPath || saved.filename}`);
     return 1;
@@ -632,6 +632,7 @@
       const bodyText = reviewContent(modal);
       const modalText = modal.innerText || "";
       const row = {
+        name: labelValue(modal, "작성자 이름"),
         id: labelValue(modal, "작성자 아이디"),
         date: reviewDate(modal),
         product: productName(modal),
@@ -646,17 +647,18 @@
       if (qualifies && !seenReviews.has(reviewKey)) {
         seenReviews.add(reviewKey);
         const index = rows.length + 1;
-        await captureClonedNodes(topReviewNodes(modal), index, "상품및작성자", row.id);
+        const captureMeta = {reviewId: row.id, reviewDate: row.date, authorName: row.name, rating};
+        await captureClonedNodes(topReviewNodes(modal), index, "상품및작성자", captureMeta);
         const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
         const reviewCard = sectionCard(modal, "리뷰 본문");
         if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
           try {
-            await captureClonedNodes([attachmentCard], index, "첨부사진", row.id);
+            await captureClonedNodes([attachmentCard], index, "첨부사진", captureMeta);
           } catch (error) {
             await log(`첨부사진 캡처를 건너뛰고 계속 진행: ${error}`);
           }
         }
-        if (reviewCard) await captureClonedNodes([reviewCard], index, "리뷰본문", row.id);
+        if (reviewCard) await captureClonedNodes([reviewCard], index, "리뷰본문", captureMeta);
         rows.push(row);
         added.push(row);
       }
