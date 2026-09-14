@@ -370,8 +370,16 @@
     document.body.appendChild(stage);
     try {
       await wait(700);
-      const rect = stage.getBoundingClientRect();
-      if (rect.height > innerHeight - 24) throw new Error(`${part} 영역이 한 화면보다 커서 분할 캡처가 필요합니다.`);
+      let rect = stage.getBoundingClientRect();
+      const maxHeight = innerHeight - 24;
+      if (rect.height > maxHeight) {
+        const scale = maxHeight / rect.height;
+        stage.style.transformOrigin = "top left";
+        stage.style.transform = `scale(${scale})`;
+        await wait(150);
+        rect = stage.getBoundingClientRect();
+        await log(`${part} 영역을 화면 높이에 맞게 ${Math.round(scale * 100)}%로 축소하여 캡처`);
+      }
       await captureVisibleRect(rect, index, part, reviewId);
       return 1;
     } finally {
@@ -642,7 +650,11 @@
         const attachmentCard = sectionCard(modal, "첨부 포토/동영상");
         const reviewCard = sectionCard(modal, "리뷰 본문");
         if (attachmentCard && !/첨부한 포토\/동영상이 없습니다/.test(attachmentCard.innerText || "")) {
-          await captureClonedNodes([attachmentCard], index, "첨부사진", row.id);
+          try {
+            await captureClonedNodes([attachmentCard], index, "첨부사진", row.id);
+          } catch (error) {
+            await log(`첨부사진 캡처를 건너뛰고 계속 진행: ${error}`);
+          }
         }
         if (reviewCard) await captureClonedNodes([reviewCard], index, "리뷰본문", row.id);
         rows.push(row);
