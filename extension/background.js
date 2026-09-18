@@ -247,10 +247,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const authorName = safeFilenamePart(message.authorName) || "이름없음";
       const hasRating = message.rating !== null && message.rating !== undefined && message.rating !== "";
       const rating = Number(message.rating);
-      const ratingLabel = hasRating && Number.isFinite(rating) ? `${rating}점` : "별점미확인";
-      const reviewId = safeFilenamePart(message.reviewId);
-      const identity = reviewId ? `_${reviewId}` : "";
-      const filename = `${captureFolder ? captureFolder + "/" : ""}${date}_${authorName}_${ratingLabel}_${message.part}${identity}${message.page > 1 ? `_${String(message.page).padStart(2, "0")}` : ""}.png`;
+      const ratingLabel = hasRating && Number.isFinite(rating) ? `별점${rating}개` : "별점미확인";
+      const filename = `${captureFolder ? captureFolder + "/" : ""}${date}_${authorName}_${ratingLabel}_${message.part}${message.page > 1 ? `_${String(message.page).padStart(2, "0")}` : ""}.png`;
       await captureStore("add", {dataUrl: message.dataUrl, filename});
       sendResponse({ok: true, filename, savedPath: `임시 보관: ${filename}`});
       return;
