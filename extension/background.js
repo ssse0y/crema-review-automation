@@ -311,8 +311,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (!response.ok) throw new Error(`Google Sheets 연결 오류 (${response.status})`);
       const result = await response.json();
       if (!result.ok) throw new Error(result.error || "Google Sheets 기록 실패");
+      const inserted = Number(result.inserted || 0);
+      const skipped = Number(result.skipped || 0);
+      if (rows.length && inserted + skipped !== rows.length) {
+        throw new Error(`시트 서버가 ${rows.length}건 중 ${inserted}건 기록, ${skipped}건 중복으로 응답했습니다. 실제 처리 건수가 맞지 않습니다.`);
+      }
       await chrome.storage.local.set({pendingReviewRows: [], pendingReviewSavedAt: ""});
-      sendResponse({ok: true, ...result});
+      sendResponse({ok: true, ...result, inserted, skipped});
       return;
     }
   })().catch(async error => {

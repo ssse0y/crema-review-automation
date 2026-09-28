@@ -1,4 +1,4 @@
-const EXPECTED_HEADERS = ['ID', '작성일', '상품명', '리뷰 내용'];
+const EXPECTED_HEADERS = ['상품명', '작성일', 'ID', '리뷰 내용'];
 
 function setupApiKey() {
   const key = Utilities.getUuid() + Utilities.getUuid();
@@ -29,7 +29,7 @@ function doPost(e) {
 
     const headers = sheet.getRange(1, 1, 1, 4).getDisplayValues()[0];
     if (headers.join('|') !== EXPECTED_HEADERS.join('|')) {
-      throw new Error('A1:D1 헤더가 ID / 작성일 / 상품명 / 리뷰 내용과 일치하지 않습니다.');
+      throw new Error('A1:D1 헤더가 상품명 / 작성일 / ID / 리뷰 내용과 일치하지 않습니다.');
     }
 
     const rows = Array.isArray(payload.rows) ? payload.rows : [];
@@ -40,7 +40,7 @@ function doPost(e) {
       : new Set();
     const uniqueRows = rows.filter(row => {
       if (!row || !row.id) return false;
-      const key = [String(row.id), normalizeDate_(row.date), String(row.product || '')].join('|');
+      const key = [String(row.product || ''), normalizeDate_(row.date), String(row.id)].join('|');
       if (existing.has(key)) return false;
       existing.add(key);
       return true;
@@ -49,9 +49,9 @@ function doPost(e) {
     if (!uniqueRows.length) return jsonResponse_({ok: true, inserted: 0, skipped});
 
     const values = uniqueRows.map(row => [
-      String(row.id || ''),
-      parseDate_(row.date),
       String(row.product || ''),
+      parseDate_(row.date),
+      String(row.id || ''),
       String(row.content || '')
     ]);
     const startRow = lastRow + 1;

@@ -769,6 +769,9 @@
     await log(`부정 리뷰 ${rows.length}건 캡처 및 시트 기록 대기 저장 완료`);
     let sheetWrite = null;
     let sheetError = "";
+    let sheetInserted = 0;
+    let sheetSkipped = 0;
+    let writtenSheetName = "";
     if (rows.length) {
       currentStage = "부정 리뷰 시트 기록";
       sheetWrite = await chrome.runtime.sendMessage({type: "writeSheet", rows});
@@ -776,6 +779,9 @@
         sheetError = sheetWrite?.error || "알 수 없는 오류";
         await log(`Google Sheets 기록 실패, 적립금 지급은 계속 진행: ${sheetError}`);
       } else {
+        sheetInserted += sheetWrite.inserted || 0;
+        sheetSkipped += sheetWrite.skipped || 0;
+        writtenSheetName = sheetWrite.sheetName || writtenSheetName;
         await log(`Google Sheets에 ${sheetWrite.inserted || 0}건 기록 완료 (${sheetWrite.skipped || 0}건 중복 제외)`);
       }
     }
@@ -791,17 +797,20 @@
         await log(`${round}회차 Google Sheets 기록 실패, 적립금 지급은 계속 진행: ${result?.error || "알 수 없는 오류"}`);
       } else {
         sheetWrite = result;
+        sheetInserted += result.inserted || 0;
+        sheetSkipped += result.skipped || 0;
+        writtenSheetName = result.sheetName || writtenSheetName;
         await log(`${round}회차 Google Sheets에 ${result.inserted || 0}건 기록 완료 (${result.skipped || 0}건 중복 제외)`);
       }
     });
     const detail = sheetError
       ? `${rows.length}건의 캡처는 저장했지만 시트 기록에 실패했습니다. 대기 데이터는 보관했습니다. 원인: ${sheetError}`
       : rows.length
-      ? `${rows.length}건을 캡처·기록했습니다.${sheetWrite?.skipped ? ` 중복 ${sheetWrite.skipped}건은 제외했습니다.` : ""}`
+      ? `${rows.length}건을 캡처했습니다. 시트 '${writtenSheetName || "이름 미확인"}'에 ${sheetInserted}행 기록했고, 중복 ${sheetSkipped}건은 제외했습니다.`
       : "캡처 조건을 만족하는 부정 리뷰가 없습니다.";
     const completionMessage = sheetError
       ? `작업 실패: 부정리뷰 ${rows.length}건 발견 · 적립금 ${payment.count}건 지급 · 시트 기록 실패`
-      : `부정리뷰 ${rows.length}건 발견 · 적립금 지급 리뷰 ${payment.count}건 완료`;
+      : `부정리뷰 ${rows.length}건 발견 · 시트 ${sheetInserted}행 기록 · 적립금 지급 리뷰 ${payment.count}건 완료`;
     await setStatus(sheetError ? "error" : "success", completionMessage, detail);
     await chrome.storage.local.set({[RUN_KEY]: false, cremaAutomationPhase: "done"});
   }
