@@ -20,6 +20,10 @@ async function captureSenderTab(sender) {
   const tabId = sender.tab?.id;
   const windowId = sender.tab?.windowId;
   if (tabId === undefined || windowId === undefined) throw new Error("캡처할 크리마 탭을 찾지 못했습니다.");
+  const runState = await chrome.storage.local.get({activeCremaAutomationTabId: null});
+  if (runState.activeCremaAutomationTabId !== tabId) {
+    throw new Error("작업 탭이 아닌 다른 탭에서 들어온 캡처 요청을 차단했습니다.");
+  }
   for (let attempt = 1; attempt <= 3; attempt++) {
     await chrome.tabs.update(tabId, {active: true});
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -136,10 +140,17 @@ chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIn
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
+    if (message.type === "isAutomationTab") {
+      const data = await chrome.storage.local.get({activeCremaAutomationTabId: null});
+      sendResponse({ok: true, allowed: sender.tab?.id === data.activeCremaAutomationTabId});
+      return;
+    }
     if (message.type === "runNow") {
       await resetRunCaptures();
+      const tab = await chrome.tabs.create({url: "about:blank"});
       await chrome.storage.local.set({
         cremaAutomationRunning: true,
+        activeCremaAutomationTabId: tab.id,
         cremaAutomationPhase: "review",
         liveEnabled: false,
         lastRunStatus: "running",
@@ -148,14 +159,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastRunAt: new Date().toISOString()
       });
       const stamp = Date.now();
-      await chrome.tabs.create({url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
+      await chrome.tabs.update(tab.id, {url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
       sendResponse({ok: true});
       return;
     }
     if (message.type === "runCaptureTest") {
       await resetRunCaptures();
+      const tab = await chrome.tabs.create({url: "about:blank"});
       await chrome.storage.local.set({
         cremaAutomationRunning: true,
+        activeCremaAutomationTabId: tab.id,
         cremaAutomationPhase: "capture_test",
         lastRunStatus: "running",
         lastRunMessage: "현재 목록의 부정리뷰 캡처·시트 기록을 테스트하고 있습니다.",
@@ -163,14 +176,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastRunAt: new Date().toISOString()
       });
       const stamp = Date.now();
-      await chrome.tabs.create({url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
+      await chrome.tabs.update(tab.id, {url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
       sendResponse({ok: true});
       return;
     }
     if (message.type === "runSheetTest") {
       await resetRunCaptures();
+      const tab = await chrome.tabs.create({url: "about:blank"});
       await chrome.storage.local.set({
         cremaAutomationRunning: true,
+        activeCremaAutomationTabId: tab.id,
         cremaAutomationPhase: "sheet_test",
         lastRunStatus: "running",
         lastRunMessage: "첫 번째 리뷰를 스프레드시트에 기록하고 있습니다.",
@@ -178,7 +193,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastRunAt: new Date().toISOString()
       });
       const stamp = Date.now();
-      await chrome.tabs.create({url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
+      await chrome.tabs.update(tab.id, {url: `https://admin.cre.ma/v2/review/new_reviews?tab=mileage_required&crema_auto=1&run=${stamp}`});
       sendResponse({ok: true});
       return;
     }

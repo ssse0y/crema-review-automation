@@ -673,6 +673,8 @@
     const state = await chrome.storage.local.get([RUN_KEY, "liveEnabled", "cremaAutomationPhase"]);
     if (marker === "1") await chrome.storage.local.set({[RUN_KEY]: true});
     if (marker !== "1" && !state[RUN_KEY]) return;
+    const tabCheck = await chrome.runtime.sendMessage({type: "isAutomationTab"});
+    if (!tabCheck?.allowed) return;
     if (findClickable("가입/로그인")) {
       await click("가입/로그인");
       // 로그인 세션이 살아 있으면 관리자 화면으로 이동하고, 그렇지 않으면
