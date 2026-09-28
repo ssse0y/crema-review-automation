@@ -392,11 +392,11 @@
     const product = productCard(modal);
     const authorName = dataDatum(modal, "작성자 이름");
     const authorId = dataDatum(modal, "작성자 아이디");
-    if (!product || !authorName || !authorId) {
-      const missing = [!product && "제품 카드", !authorName && "작성자 이름", !authorId && "작성자 아이디"].filter(Boolean).join(", ");
+    if (!product || !authorName) {
+      const missing = [!product && "제품 카드", !authorName && "작성자 이름"].filter(Boolean).join(", ");
       throw new Error(`캡처할 영역을 찾지 못했습니다: ${missing}`);
     }
-    return [product, heading, authorName, authorId];
+    return [product, heading, authorName, authorId].filter(Boolean);
   }
 
   async function waitForReviewCaptureNodes(modal, timeout = 10000) {
@@ -405,7 +405,7 @@
       let timer;
       const check = () => {
         const currentModal = modal?.isConnected && visible(modal) ? modal : modalRoot();
-        if (currentModal && productCard(currentModal) && dataDatum(currentModal, "작성자 이름") && dataDatum(currentModal, "작성자 아이디")) {
+        if (currentModal && productCard(currentModal) && dataDatum(currentModal, "작성자 이름")) {
           observer?.disconnect();
           clearTimeout(timer);
           resolve(currentModal);
@@ -631,9 +631,10 @@
       await resetModalToTop(modal);
       const bodyText = reviewContent(modal);
       const modalText = modal.innerText || "";
+      const authorName = labelValue(modal, "작성자 이름") || "구매자 정보 없음";
       const row = {
-        name: labelValue(modal, "작성자 이름"),
-        id: labelValue(modal, "작성자 아이디"),
+        name: authorName,
+        id: labelValue(modal, "작성자 아이디") || authorName,
         date: reviewDate(modal),
         product: productName(modal),
         content: bodyText,
@@ -738,8 +739,9 @@
       let modal = await waitForModal();
       if (!modal) throw new Error("첫 번째 리뷰 상세 팝업이 화면에 나타나지 않았습니다.");
       modal = await waitForReviewCaptureNodes(modal);
+      const testAuthorName = labelValue(modal, "작성자 이름") || "구매자 정보 없음";
       const row = {
-        id: labelValue(modal, "작성자 아이디"),
+        id: labelValue(modal, "작성자 아이디") || testAuthorName,
         date: reviewDate(modal),
         product: productName(modal),
         content: reviewContent(modal)
