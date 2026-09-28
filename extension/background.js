@@ -16,6 +16,22 @@ async function waitForCaptureSlot() {
   lastCaptureAt = Date.now();
 }
 
+async function captureSenderTab(sender) {
+  const tabId = sender.tab?.id;
+  const windowId = sender.tab?.windowId;
+  if (tabId === undefined || windowId === undefined) throw new Error("캡처할 크리마 탭을 찾지 못했습니다.");
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await chrome.tabs.update(tabId, {active: true});
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const [activeBefore] = await chrome.tabs.query({active: true, windowId});
+    if (activeBefore?.id !== tabId) continue;
+    const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {format: "png"});
+    const [activeAfter] = await chrome.tabs.query({active: true, windowId});
+    if (activeAfter?.id === tabId) return dataUrl;
+  }
+  throw new Error("캡처 도중 다른 탭이 활성화되어 크리마 화면을 찍지 못했습니다. 작업 탭을 그대로 둔 뒤 다시 시도해주세요.");
+}
+
 async function waitForDownload(downloadId, timeout = 30000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -203,7 +219,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "capture") {
       await waitForCaptureSlot();
-      const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, {format: "png"});
+      const dataUrl = await captureSenderTab(sender);
       const {captureFolder} = await settings();
       const date = new Date().toLocaleDateString("sv-SE");
       const suffix = message.index ? `_${String(message.index).padStart(2, "0")}` : `_${message.label || "진단"}`;
@@ -214,7 +230,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "captureRaw") {
       await waitForCaptureSlot();
-      const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, {format: "png"});
+      const dataUrl = await captureSenderTab(sender);
       sendResponse({ok: true, dataUrl});
       return;
     }
