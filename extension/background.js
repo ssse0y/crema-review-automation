@@ -147,7 +147,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "runNow") {
       await resetRunCaptures();
-      const tab = await chrome.tabs.create({url: "about:blank"});
+      const tab = await chrome.tabs.create({url: "about:blank", active: false});
       await chrome.storage.local.set({
         cremaAutomationRunning: true,
         activeCremaAutomationTabId: tab.id,
@@ -165,7 +165,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "runCaptureTest") {
       await resetRunCaptures();
-      const tab = await chrome.tabs.create({url: "about:blank"});
+      const tab = await chrome.tabs.create({url: "about:blank", active: false});
       await chrome.storage.local.set({
         cremaAutomationRunning: true,
         activeCremaAutomationTabId: tab.id,
@@ -182,7 +182,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "runSheetTest") {
       await resetRunCaptures();
-      const tab = await chrome.tabs.create({url: "about:blank"});
+      const tab = await chrome.tabs.create({url: "about:blank", active: false});
       await chrome.storage.local.set({
         cremaAutomationRunning: true,
         activeCremaAutomationTabId: tab.id,
@@ -335,6 +335,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ok: true, ...result, inserted, skipped});
       return;
     }
+    sendResponse({ok: false, error: `알 수 없는 메시지입니다: ${String(message.type || "유형 없음")}`});
   })().catch(async error => {
     const prior = await chrome.storage.local.get({automationLog: []});
     await chrome.storage.local.set({
